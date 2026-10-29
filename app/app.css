@@ -166,3 +166,9 @@ table.charge td a{display:block;padding:10px 6px;text-decoration:none;color:var(
 td.date{white-space:nowrap}
 table.charge td{vertical-align:middle}
 table.charge td:last-child{padding:10px 12px}
+
+/* ---------- Carnet, côté équipe ---------- */
+.liste li.poste{padding:14px 16px;background:#fff;border:1px solid var(--sable);border-radius:14px;display:grid;gap:8px}
+.poste .puces{display:flex;flex-wrap:wrap;gap:6px}
+.poste .detail{min-height:44px;font-size:15px}
+.fichier{cursor:pointer}

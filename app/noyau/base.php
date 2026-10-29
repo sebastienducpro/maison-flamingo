@@ -11,7 +11,7 @@ date_default_timezone_set('Europe/Paris');
 // Un avertissement glissé dans une réponse casse le JSON et peut montrer un chemin du serveur.
 ini_set('display_errors', '0');
 
-const VERSION_SCHEMA = 2;
+const VERSION_SCHEMA = 3;
 const TAILLE_PHOTO_MAX = 4000000;
 const PHOTOS_MAX = 6;
 const EXPEDITEUR = 'contact@maisonflamingo.fr';
@@ -212,11 +212,20 @@ function migrer(PDO $db): void
         CREATE INDEX IF NOT EXISTS i_demandes ON demandes(client_id, traitee_le);
         CREATE INDEX IF NOT EXISTS i_journal ON journal(quand);
     ");
+    // Version 3 : le carnet de la maison. Ce qui a été fait, ce qui arrive, et la preuve.
+    $db->exec("
+        CREATE TABLE IF NOT EXISTS carnet_postes (id INTEGER PRIMARY KEY, client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE, cle TEXT NOT NULL, etat TEXT NOT NULL DEFAULT '', detail TEXT NOT NULL DEFAULT '', maj_le TEXT NOT NULL, maj_par TEXT NOT NULL DEFAULT '', UNIQUE(client_id, cle));
+        CREATE TABLE IF NOT EXISTS carnet_evenements (id INTEGER PRIMARY KEY, client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE, quand TEXT, echeance TEXT NOT NULL DEFAULT '', titre TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '', organise TEXT NOT NULL DEFAULT 'nous', statut TEXT NOT NULL DEFAULT 'prevu', cree_le TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS carnet_equipements (id INTEGER PRIMARY KEY, client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE, nom TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '', maj_le TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS carnet_documents (id INTEGER PRIMARY KEY, client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE, titre TEXT NOT NULL, fichier TEXT NOT NULL, type TEXT NOT NULL, octets INTEGER NOT NULL DEFAULT 0, cree_le TEXT NOT NULL, cree_par TEXT NOT NULL DEFAULT '');
+        CREATE INDEX IF NOT EXISTS i_evenements ON carnet_evenements(client_id, quand);
+    ");
+    $version = (int) $db->query('PRAGMA user_version')->fetchColumn();
     $db->beginTransaction();
     // Une base de la première version a un seul compte, le gérant : il devient la direction,
     // et ses clients rejoignent une première agence. Rien n'est perdu ni recopié à la main.
     $nb = (int) $db->query('SELECT (SELECT COUNT(*) FROM utilisateurs) + (SELECT COUNT(*) FROM clients)')->fetchColumn();
-    if ($nb > 0) {
+    if ($version < 2 && $nb > 0) {
         if (!(int) $db->query('SELECT COUNT(*) FROM agences')->fetchColumn()) {
             $db->prepare('INSERT INTO agences (nom, ville, cree_le) VALUES (?,?,?)')->execute(['Nîmes', 'Nîmes', maintenant()]);
         }

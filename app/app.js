@@ -176,6 +176,7 @@ async function route() {
     switch (morceaux[0]) {
       case 'connexion': return await vueConnexion();
       case 'client': return await vueClient(morceaux[1]);
+      case 'carnet': return await vueCarnet(morceaux[1]);
       case 'visite': return await vueVisite(morceaux[1], morceaux[2]);
       case 'envoi': return await vueEnvoi();
       case 'tournee': return await vueTournee(morceaux[1], morceaux[2]);
@@ -359,6 +360,7 @@ async function vueClient(id) {
     <div class="gros-boutons">
       <a class="bouton principal" href="#/visite/${c.id}/diagnostic">Faire un diagnostic</a>
       <a class="bouton principal clair" href="#/visite/${c.id}/passage">Saisir un passage</a>
+      ${!horsLigne ? `<a class="bouton secondaire" href="#/carnet/${c.id}">Carnet de la maison</a>` : ''}
     </div>
     <div class="actions-ligne">
       ${tel ? `<a class="bouton secondaire" href="tel:${tel}">Appeler</a><a class="bouton secondaire" href="sms:${tel}">SMS</a>` : ''}

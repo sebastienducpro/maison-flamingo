@@ -407,6 +407,10 @@ function a_client_supprimer(): void
         }
         @rmdir($dossier);
     }
+    foreach (glob(dossier_documents((int) $c['id']) . '/*') ?: [] as $f) {
+        @unlink($f);
+    }
+    @rmdir(dossier_documents((int) $c['id']));
     $db->prepare('DELETE FROM clients WHERE id = ?')->execute([$c['id']]);
     tracer($u, 'client supprimé', $c['id'] . ' ' . $c['prenom'] . ' ' . $c['nom']);
     sortir(200, ['ok' => true]);
@@ -516,6 +520,7 @@ function a_visite_enregistrer(): void
             }
         }
     }
+    carnet_piscine_depuis_visite((int) $client['id'], $contenu, compter_alertes($contenu), $u['nom']);
     // Les notes d'accès suivent le client d'une visite à l'autre.
     if (isset($d['acces']) && is_string($d['acces'])) {
         $db->prepare('UPDATE clients SET acces = ? WHERE id = ?')->execute([texte($d['acces'], 1000), $client['id']]);
