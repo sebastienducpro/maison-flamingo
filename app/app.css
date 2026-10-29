@@ -172,3 +172,16 @@ table.charge td:last-child{padding:10px 12px}
 .poste .puces{display:flex;flex-wrap:wrap;gap:6px}
 .poste .detail{min-height:44px;font-size:15px}
 .fichier{cursor:pointer}
+
+/* ---------- Leads, badges, secteurs ---------- */
+.menu a{position:relative}
+.badge{display:inline-block;margin-left:6px;min-width:20px;padding:0 6px;border-radius:999px;background:var(--orange);color:#fff;font-size:12px;line-height:20px;text-align:center}
+.badge.retard{background:var(--rouge)}
+.liste a.retard{border-color:var(--rouge)}
+.pastille.rouge{background:#FBE1DC;color:#7A2418}
+.pastille.orange{background:#FBEBD8;color:#9A5410}
+.lead-ouvert{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.lead-ouvert .secondaire{min-height:40px;font-size:14px}
+h2 .petit{min-height:36px;font-size:14px;padding:0 12px;margin-left:10px;vertical-align:middle}
+li.secteur .deux{margin-top:8px}
+li.secteur label{margin-bottom:6px}

@@ -41,8 +41,14 @@ function vueConnexionClient(message = '') {
         <button>Entrer</button>
         <p class="message" id="m" role="status">${echapper(message)}</p>
       </form>
-      <p class="aide">Mot de passe oublié ? Appelez-nous, nous vous envoyons un nouveau lien.</p>
+      <button class="discret" id="oubli">Mot de passe oublié</button>
     </section>`;
+  document.getElementById('oubli').addEventListener('click', async () => {
+    const f = document.getElementById('f'), m = document.getElementById('m');
+    if (!f.courriel.value) { m.textContent = 'Saisissez d\'abord votre courriel.'; return; }
+    await appel('motdepasse_oublie', { methode: 'POST', corps: { courriel: f.courriel.value, genre: 'client' } });
+    m.textContent = 'Si cette adresse est connue, un lien part dans la minute. Rien reçu ? Appelez-nous.';
+  });
   document.getElementById('f').addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const f = ev.target, m = document.getElementById('m');

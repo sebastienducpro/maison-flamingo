@@ -11,7 +11,7 @@ date_default_timezone_set('Europe/Paris');
 // Un avertissement glissé dans une réponse casse le JSON et peut montrer un chemin du serveur.
 ini_set('display_errors', '0');
 
-const VERSION_SCHEMA = 3;
+const VERSION_SCHEMA = 4;
 const TAILLE_PHOTO_MAX = 4000000;
 const PHOTOS_MAX = 6;
 const EXPEDITEUR = 'contact@maisonflamingo.fr';
@@ -194,6 +194,11 @@ function migrer(PDO $db): void
     ajouter_colonne($db, 'visites', 'duree_min', 'INTEGER');
     ajouter_colonne($db, 'visites', 'charge', "TEXT NOT NULL DEFAULT ''");
     ajouter_colonne($db, 'visites', 'technicien_id', 'INTEGER');
+    // Version 4 : les leads. Quand il est arrivé, quand il a été confié, quand on l'a rappelé, et par qui.
+    ajouter_colonne($db, 'clients', 'lead_recu_le', 'TEXT');
+    ajouter_colonne($db, 'clients', 'lead_attribue_le', 'TEXT');
+    ajouter_colonne($db, 'clients', 'lead_contacte_le', 'TEXT');
+    ajouter_colonne($db, 'clients', 'lead_contact_par', "TEXT NOT NULL DEFAULT ''");
     ajouter_colonne($db, 'visites', 'alertes', 'INTEGER');
     ajouter_colonne($db, 'journal', 'role', "TEXT NOT NULL DEFAULT ''");
     ajouter_colonne($db, 'journal', 'agence_id', 'INTEGER');
@@ -219,6 +224,8 @@ function migrer(PDO $db): void
         CREATE TABLE IF NOT EXISTS carnet_equipements (id INTEGER PRIMARY KEY, client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE, nom TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '', maj_le TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS carnet_documents (id INTEGER PRIMARY KEY, client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE, titre TEXT NOT NULL, fichier TEXT NOT NULL, type TEXT NOT NULL, octets INTEGER NOT NULL DEFAULT 0, cree_le TEXT NOT NULL, cree_par TEXT NOT NULL DEFAULT '');
         CREATE INDEX IF NOT EXISTS i_evenements ON carnet_evenements(client_id, quand);
+        CREATE TABLE IF NOT EXISTS secteurs (id INTEGER PRIMARY KEY, commune TEXT UNIQUE NOT NULL, libelle TEXT NOT NULL, agence_id INTEGER NOT NULL REFERENCES agences(id), technicien_id INTEGER, maj_le TEXT NOT NULL);
+        CREATE INDEX IF NOT EXISTS i_leads ON clients(lead_contacte_le, lead_attribue_le);
     ");
     $version = (int) $db->query('PRAGMA user_version')->fetchColumn();
     $db->beginTransaction();

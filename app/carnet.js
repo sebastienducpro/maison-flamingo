@@ -24,7 +24,7 @@ async function vueCarnet(id) {
     </li>`).join('')}</ul>
     <p class="message" id="m-postes" role="status"></p>
 
-    <h2>À venir</h2>
+    <h2>À venir <button type="button" class="secondaire petit" id="saison">Poser la saison type</button></h2>
     <ul class="liste">${d.evenements.map((e) => `<li class="demande${e.statut !== 'prevu' ? ' traitee' : ''}">
       <span class="nom">${echapper(e.titre)}</span> <span class="sous">${e.quand ? echapper(dateCourte(e.quand)) : echapper(e.echeance)} · ${ORGANISE[e.organise]}${e.statut === 'fait' ? ' · fait' : e.statut === 'annule' ? ' · annulé' : ''}</span>
       ${e.detail ? `<p>${echapper(e.detail)}</p>` : ''}
@@ -75,6 +75,10 @@ async function vueCarnet(id) {
       enregistrerPoste(li);
     }));
     li.querySelector('.detail').addEventListener('change', () => enregistrerPoste(li));
+  });
+  document.getElementById('saison').addEventListener('click', async () => {
+    const r = await api('carnet_saison', { methode: 'POST', corps: { id: c.id } });
+    if (r.ok) vueCarnet(c.id); else alert('La saison type dépend de la formule du client : renseignez-la dans la fiche (Piscine, Maison fermée…).');
   });
   document.getElementById('f-ev').addEventListener('submit', async (ev) => {
     ev.preventDefault();

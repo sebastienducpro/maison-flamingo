@@ -141,6 +141,7 @@ async function demarrer() {
   if (!etat.installee) return vueInstaller();
   if (!APP.utilisateur) return vueConnexion();
   viderFile();
+  majAFaire();
   route();
 }
 
@@ -150,10 +151,21 @@ function accueilDuRole() {
 }
 
 const MENUS = {
-  technicien: [['#/tournee', 'Tournée'], ['#/clients', 'Clients'], ['#/demandes', 'Demandes'], ['#/compte', 'Compte']],
-  chef: [['#/tableau', 'Tableau'], ['#/tournee', 'Tournées'], ['#/charge', 'Semaine'], ['#/clients', 'Clients'], ['#/equipe', 'Équipe'], ['#/demandes', 'Demandes'], ['#/compte', 'Compte']],
-  superadmin: [['#/tableau', 'Tableau'], ['#/tournee', 'Tournées'], ['#/charge', 'Semaine'], ['#/clients', 'Clients'], ['#/equipe', 'Équipe'], ['#/agences', 'Agences'], ['#/demandes', 'Demandes'], ['#/sauvegardes', 'Sauvegardes'], ['#/journal', 'Journal'], ['#/compte', 'Compte']],
+  technicien: [['#/tournee', 'Tournée'], ['#/leads', 'Leads'], ['#/clients', 'Clients'], ['#/demandes', 'Demandes'], ['#/compte', 'Compte']],
+  chef: [['#/tableau', 'Tableau'], ['#/leads', 'Leads'], ['#/tournee', 'Tournées'], ['#/charge', 'Semaine'], ['#/clients', 'Clients'], ['#/secteurs', 'Secteurs'], ['#/equipe', 'Équipe'], ['#/demandes', 'Demandes'], ['#/compte', 'Compte']],
+  superadmin: [['#/tableau', 'Tableau'], ['#/leads', 'Leads'], ['#/tournee', 'Tournées'], ['#/charge', 'Semaine'], ['#/clients', 'Clients'], ['#/secteurs', 'Secteurs'], ['#/equipe', 'Équipe'], ['#/agences', 'Agences'], ['#/demandes', 'Demandes'], ['#/sauvegardes', 'Sauvegardes'], ['#/journal', 'Journal'], ['#/compte', 'Compte']],
 };
+
+// Ce qui attend : un chiffre sur Leads et Demandes, relu toutes les minutes. L'écran rappelle, il ne décide pas.
+const A_FAIRE = { leads: 0, leads_retard: 0, demandes: 0 };
+async function majAFaire() {
+  if (!APP.utilisateur || !navigator.onLine) return;
+  try {
+    const d = await api('a_faire');
+    if (d.ok) { Object.assign(A_FAIRE, d); dessinerNav(); }
+  } catch (e) { /* hors ligne : les badges gardent leur dernière valeur */ }
+}
+setInterval(majAFaire, 60000);
 
 function dessinerNav() {
   const nav = document.getElementById('nav');
@@ -161,7 +173,8 @@ function dessinerNav() {
   const menu = APP.utilisateur ? MENUS[APP.utilisateur.role] || [] : [];
   nav.hidden = !menu.length;
   const ici = '#/' + (location.hash.slice(2).split('/')[0] || '');
-  nav.innerHTML = menu.map(([h, l]) => `<a href="${h}"${h === ici ? ' aria-current="page"' : ''}>${l}</a>`).join('');
+  const badge = (h) => (h === '#/leads' && A_FAIRE.leads ? `<span class="badge${A_FAIRE.leads_retard ? ' retard' : ''}">${A_FAIRE.leads}</span>` : h === '#/demandes' && A_FAIRE.demandes ? `<span class="badge">${A_FAIRE.demandes}</span>` : '');
+  nav.innerHTML = menu.map(([h, l]) => `<a href="${h}"${h === ici ? ' aria-current="page"' : ''}>${l}${badge(h)}</a>`).join('');
 }
 
 async function route() {
@@ -177,6 +190,8 @@ async function route() {
       case 'connexion': return await vueConnexion();
       case 'client': return await vueClient(morceaux[1]);
       case 'carnet': return await vueCarnet(morceaux[1]);
+      case 'leads': return await vueLeads(morceaux[1] === 'tous');
+      case 'secteurs': return await vueSecteurs();
       case 'visite': return await vueVisite(morceaux[1], morceaux[2]);
       case 'envoi': return await vueEnvoi();
       case 'tournee': return await vueTournee(morceaux[1], morceaux[2]);
@@ -235,7 +250,14 @@ function vueConnexion() {
         <button class="principal">Se connecter</button>
         <p class="message" id="m" role="status"></p>
       </form>
+      <button class="discret" id="oubli">Mot de passe oublié</button>
     </section>`;
+  document.getElementById('oubli').addEventListener('click', async () => {
+    const f = document.getElementById('f'), m = document.getElementById('m');
+    if (!f.courriel.value) { m.textContent = 'Saisissez d\'abord votre courriel.'; return; }
+    await api('motdepasse_oublie', { methode: 'POST', corps: { courriel: f.courriel.value, genre: 'equipe' } });
+    m.textContent = 'Si cette adresse est connue, un lien part dans la minute. Rien reçu ? Demandez un lien à votre responsable.';
+  });
   document.getElementById('f').addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const f = ev.target, m = document.getElementById('m');
@@ -356,6 +378,8 @@ async function vueClient(id) {
     <div class="tete">
       <div><h1>${echapper((c.prenom + ' ' + c.nom).trim())}</h1><p class="sous">${[echapper(c.commune), STATUTS[c.statut], c.jour_passage ? JOURS[c.jour_passage] : '', d.duree_estimee ? 'environ ' + d.duree_estimee + ' min' : ''].filter(Boolean).join(' · ')}</p></div>
     </div>
+    ${c.lead_recu_le && !c.lead_contacte_le ? `<div class="bandeau alerte lead-ouvert"><strong>Lead reçu ${echapper(dateFr(c.lead_recu_le))}</strong>${c.origine ? ' · ' + echapper(c.origine) : ''}${c.technicien_id ? '' : ' · <strong>aucun technicien</strong>'}. Appeler ou envoyer un SMS compte comme premier contact. <button class="secondaire" id="contact-fait">Premier contact fait</button></div>`
+      : c.lead_contacte_le ? `<p class="aide">Lead du ${echapper(dateFr(c.lead_recu_le, false))}, premier contact ${echapper(dateFr(c.lead_contacte_le))} par ${echapper(c.lead_contact_par)}.</p>` : ''}
     ${c.acces ? `<p class="acces"><strong>Accès</strong> ${echapper(c.acces)}</p>` : ''}
     <div class="gros-boutons">
       <a class="bouton principal" href="#/visite/${c.id}/diagnostic">Faire un diagnostic</a>
@@ -363,7 +387,7 @@ async function vueClient(id) {
       ${!horsLigne ? `<a class="bouton secondaire" href="#/carnet/${c.id}">Carnet de la maison</a>` : ''}
     </div>
     <div class="actions-ligne">
-      ${tel ? `<a class="bouton secondaire" href="tel:${tel}">Appeler</a><a class="bouton secondaire" href="sms:${tel}">SMS</a>` : ''}
+      ${tel ? `<a class="bouton secondaire" href="tel:${tel}" data-contact>Appeler</a><a class="bouton secondaire" href="sms:${tel}" data-contact>SMS</a>` : ''}
       ${c.adresse ? `<a class="bouton secondaire" href="https://maps.apple.com/?daddr=${encodeURIComponent(c.adresse + ' ' + c.commune)}" rel="noopener">Itinéraire</a>` : ''}
     </div>
     ${ouvertes.length ? `<h2>Demandes du client</h2><ul class="liste">${ouvertes.map((x) => `<li class="demande"><p>${echapper(x.texte)}</p><span class="sous">${echapper(dateFr(x.cree_le))}</span><a class="bouton secondaire" href="#/demandes">Répondre</a></li>`).join('')}</ul>` : ''}
@@ -407,6 +431,14 @@ async function vueClient(id) {
     </form>
     ${!nouveau && pilote && !horsLigne ? `<p class="zone-danger"><button class="discret danger" id="supprimer">Supprimer la fiche, ses visites et ses photos</button></p>` : ''}`;
 
+  const contactFait = async () => {
+    if (!c.lead_recu_le || c.lead_contacte_le) return;
+    const r = await api('lead_contacte', { methode: 'POST', corps: { id: c.id } }).catch(() => ({ ok: false }));
+    if (r.ok) { c.lead_contacte_le = new Date().toISOString(); const b = vue().querySelector('.lead-ouvert'); if (b) b.outerHTML = '<p class="aide">Premier contact fait à l\'instant.</p>'; majAFaire(); }
+  };
+  vue().querySelectorAll('[data-contact]').forEach((a) => a.addEventListener('click', contactFait));
+  const bc = document.getElementById('contact-fait');
+  if (bc) bc.addEventListener('click', contactFait);
   vue().querySelectorAll('[data-visite]').forEach((a) => a.addEventListener('click', (ev) => {
     ev.preventDefault();
     const v = visites[+a.dataset.visite];

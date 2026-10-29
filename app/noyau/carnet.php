@@ -283,3 +283,43 @@ function a_espace_creneau(): void
     tracer('client ' . $c['id'], 'demande de créneau', (string) $titre);
     sortir(200, ['ok' => true]);
 }
+
+// La saison type : les rendez-vous qu'une formule implique, posés d'un geste. Jamais en double.
+function a_carnet_saison(): void
+{
+    $u = exiger_equipe();
+    exiger_post();
+    $c = exiger_client_autorise($u, entier(entree()['id'] ?? 0));
+    $annee = (int) date('Y');
+    $mois = (int) date('n');
+    $prochaine = fn (int $m, int $j) => sprintf('%04d-%02d-%02d', $annee + ($mois > $m ? 1 : 0), $m, $j);
+    $piscine = str_contains(mb_strtolower($c['formule']), 'piscine');
+    $maison = str_contains(mb_strtolower($c['formule']), 'maison');
+    $modeles = [];
+    if ($piscine) {
+        $modeles[] = ['titre' => 'Hivernage de la piscine', 'quand' => $prochaine(11, 25), 'detail' => 'Le flamant rentre, la bâche se pose. L\'eau est équilibrée pour l\'hiver.'];
+        $modeles[] = ['titre' => 'Contrôle d\'hiver', 'quand' => $prochaine(1, 15), 'detail' => 'Bâche et niveau d\'eau après le gel, tour du local technique.'];
+        $modeles[] = ['titre' => 'Remise en route de la piscine', 'quand' => $prochaine(3, 25), 'detail' => 'Le flamant revient sur l\'eau. Filtre, produits, premiers réglages.'];
+    }
+    if ($maison) {
+        $modeles[] = ['titre' => 'Entretien de la chaudière', 'echeance' => 'avant le 15 novembre', 'detail' => 'Chauffagiste partenaire. Nous ouvrons la maison et restons sur place ; l\'attestation arrive dans vos documents.'];
+        $modeles[] = ['titre' => 'Visite de printemps', 'quand' => $prochaine(4, 10), 'detail' => 'Climatisation, volets, détecteurs, aération.'];
+    }
+    if (!$modeles) {
+        sortir(200, ['ok' => false, 'erreur' => 'formule']);
+    }
+    $db = base();
+    $existe = $db->prepare("SELECT COUNT(*) FROM carnet_evenements WHERE client_id = ? AND titre = ? AND statut = 'prevu'");
+    $ins = $db->prepare("INSERT INTO carnet_evenements (client_id, quand, echeance, titre, detail, organise, statut, cree_le) VALUES (?,?,?,?,?, 'nous', 'prevu', ?)");
+    $poses = 0;
+    foreach ($modeles as $m) {
+        $existe->execute([$c['id'], $m['titre']]);
+        if ((int) $existe->fetchColumn() > 0) {
+            continue;
+        }
+        $ins->execute([$c['id'], $m['quand'] ?? null, $m['echeance'] ?? '', $m['titre'], $m['detail'], maintenant()]);
+        $poses++;
+    }
+    tracer($u, 'carnet : saison type', "{$c['id']} $poses rendez-vous");
+    sortir(200, ['ok' => true, 'poses' => $poses]);
+}

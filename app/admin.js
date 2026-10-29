@@ -121,6 +121,7 @@ function libellePoint(k) {
   return k;
 }
 
+const delaiLisible = (h) => (h < 1 ? Math.round(h * 60) + ' min' : h < 48 ? (Math.round(h * 10) / 10).toString().replace('.', ',') + ' h' : Math.round(h / 24) + ' j');
 const pourcent = (a, b) => (b ? Math.round((a / b) * 100) + ' %' : '–');
 const heures = (min) => (min >= 60 ? Math.floor(min / 60) + ' h ' + String(min % 60).padStart(2, '0') : min + ' min');
 const tuileHtml = (valeur, libelle, sous = '', classe = '') => `<div class="kpi ${classe}"><span class="kpi-val">${valeur}</span><span class="kpi-lib">${libelle}</span>${sous ? `<span class="kpi-sous">${sous}</span>` : ''}</div>`;
@@ -148,15 +149,25 @@ async function vueTableau(agence) {
       ${tuileHtml(pourcent(d.avec_points_30j, d.visites_30j), 'visites avec un point à reprendre')}
       ${tuileHtml(d.demandes_en_attente, 'demandes clients en attente', d.comptes_clients + (d.comptes_clients > 1 ? ' espaces clients ouverts' : ' espace client ouvert'), d.demandes_en_attente ? 'a-voir' : '')}
     </div>
+    <h2>Les leads <span class="aide">30 derniers jours · objectif : un premier contact dans la journée</span></h2>
+    <div class="kpis">
+      ${tuileHtml(d.leads.recus_30j, 'leads entrants', d.leads.part_du_total !== null && d.agence ? pourcent(d.leads.recus_30j, d.leads.recus_30j / (d.leads.part_du_total || 1)) + ' du total' : d.leads.contactes_30j + ' contactés')}
+      ${tuileHtml(d.leads.taux_reponse !== null ? Math.round(d.leads.taux_reponse * 100) + ' %' : '–', 'taux de réponse', d.leads.contactes_30j + ' sur ' + d.leads.recus_30j, d.leads.taux_reponse !== null && d.leads.taux_reponse < 0.9 ? 'a-voir' : '')}
+      ${tuileHtml(d.leads.delai_moyen_h !== null ? delaiLisible(d.leads.delai_moyen_h) : '–', 'temps de réponse moyen', 'entre l\'attribution et le premier contact', d.leads.delai_moyen_h !== null && d.leads.delai_moyen_h > d.leads.retard_h ? 'a-voir' : '')}
+      ${tuileHtml(d.leads.en_retard, 'en attente depuis plus de ' + d.leads.retard_h + ' h', d.leads.sans_technicien ? d.leads.sans_technicien + ' sans technicien' : '', d.leads.en_retard ? 'a-voir' : '')}
+    </div>
     <h2>Ce qui revient le plus <span class="aide">90 derniers jours : là où sont les travaux à proposer</span></h2>
     ${d.points_frequents.length ? `<ul class="barres">${d.points_frequents.map((p) => `<li><span>${echapper(libellePoint(p.point))}</span><meter min="0" max="${maxPoint}" value="${p.nombre}"></meter><strong>${p.nombre}</strong></li>`).join('')}</ul>` : '<p class="aide">Rien à signaler pour l\'instant.</p>'}
     <h2>${d.detail_par === 'agence' ? 'Par agence' : 'Par technicien'}</h2>
     <div class="table-defile"><table>
-      <thead><tr><th>${d.detail_par === 'agence' ? 'Agence' : 'Technicien'}</th><th>Clients</th><th>Visites 30 j</th><th>Semaine</th>${d.detail_par === 'agence' ? '<th>Demandes</th>' : '<th>Durée moy.</th>'}</tr></thead>
+      <thead><tr><th>${d.detail_par === 'agence' ? 'Agence' : 'Technicien'}</th><th>Clients</th><th>Visites 30 j</th><th>Semaine</th>${d.detail_par === 'agence' ? '<th>Demandes</th>' : '<th>Durée moy.</th>'}<th>Leads 30 j</th><th>Réponse</th><th>Délai moy.</th></tr></thead>
       <tbody>${d.detail.map((x) => `<tr>
         <td>${d.detail_par === 'agence' ? `<a href="#/tableau/${x.id}">${echapper(x.nom)}</a>` : `<a href="#/tournee/${x.id}">${echapper(x.nom)}</a>`}</td>
         <td>${x.clients}</td><td>${x.visites_30j}</td><td>${x.faits} / ${x.prevus}</td>
-        <td>${d.detail_par === 'agence' ? x.demandes : (x.duree_moyenne ? x.duree_moyenne + ' min' : '–')}</td></tr>`).join('') || '<tr><td colspan="5">Personne pour l\'instant.</td></tr>'}</tbody>
+        <td>${d.detail_par === 'agence' ? x.demandes : (x.duree_moyenne ? x.duree_moyenne + ' min' : '–')}</td>
+        <td>${x.leads.recus}${x.leads.en_retard ? ` <span class="pastille rouge">${x.leads.en_retard} en retard</span>` : ''}</td>
+        <td>${x.leads.taux_reponse !== null ? Math.round(x.leads.taux_reponse * 100) + ' %' : '–'}</td>
+        <td>${x.leads.delai_moyen_h !== null ? delaiLisible(x.leads.delai_moyen_h) : '–'}</td></tr>`).join('') || '<tr><td colspan="8">Personne pour l\'instant.</td></tr>'}</tbody>
     </table></div>
     <div class="actions-ligne">
       <a class="bouton secondaire" href="api.php?action=export&genre=clients">Exporter les clients</a>
@@ -313,4 +324,85 @@ async function vueSauvegardes() {
     m.textContent = r.ok ? 'Copie faite et relue.' : 'La copie a échoué : regardez le journal.';
     setTimeout(vueSauvegardes, 900);
   });
+}
+
+/* ---------- Leads : qui attend un premier contact ---------- */
+
+const age = (iso) => {
+  const h = (Date.now() - new Date(iso)) / 3600000;
+  return h < 1 ? 'il y a ' + Math.max(1, Math.round(h * 60)) + ' min' : h < 48 ? 'il y a ' + Math.round(h) + ' h' : 'il y a ' + Math.round(h / 24) + ' j';
+};
+
+async function vueLeads(tous = false) {
+  vue().innerHTML = '<p class="chargement">Chargement…</p>';
+  const d = await api('leads', { params: tous ? { tous: '1' } : {} });
+  if (!d.ok) return;
+  const pilote = APP.utilisateur.role !== 'technicien';
+  const retard = (l) => !l.lead_contacte_le && (Date.now() - new Date(l.lead_attribue_le || l.lead_recu_le)) / 3600000 > d.retard_h;
+  vue().innerHTML = `
+    <div class="tete"><h1>Leads <span class="aide">${tous ? 'tous, 30 derniers jours et plus' : 'en attente d\'un premier contact'}</span></h1>
+      <a class="bouton secondaire" href="${tous ? '#/leads' : '#/leads/tous'}">${tous ? 'En attente seulement' : 'Voir tous'}</a></div>
+    <p class="aide">L'objectif de la maison : un premier contact dans la journée. Appeler ou envoyer un SMS depuis la fiche ferme le chrono.</p>
+    <ul class="liste">${d.leads.map((l) => `<li><a href="#/client/${l.id}" class="${retard(l) ? 'retard' : ''}">
+      <span class="nom">${echapper((l.prenom + ' ' + l.nom).trim())}${l.lead_contacte_le ? '' : ` <span class="pastille ${retard(l) ? 'rouge' : 'orange'}">${age(l.lead_recu_le)}</span>`}</span>
+      <span class="statut ${l.lead_contacte_le ? 'statut-client' : 'statut-prospect'}">${l.lead_contacte_le ? 'Contacté' : l.technicien ? 'À appeler' : 'Sans technicien'}</span>
+      <span class="sous">${echapper(l.commune || 'Commune ?')}${l.offre ? ' · ' + echapper(l.offre) : ''} · ${echapper(l.origine)}${pilote && l.technicien ? ' · ' + echapper(l.technicien) : ''}${APP.utilisateur.role === 'superadmin' && l.agence ? ' · ' + echapper(l.agence) : ''}${l.lead_contacte_le ? ' · contacté ' + echapper(age(l.lead_contacte_le)) + ' par ' + echapper(l.lead_contact_par) : ''}</span>
+    </a></li>`).join('') || `<li class="vide">${tous ? 'Aucun lead.' : 'Aucun lead en attente : tout le monde a été rappelé.'}</li>`}</ul>
+    ${pilote ? `<form id="f-lead" class="carte">
+      <h2>Lead reçu par téléphone</h2>
+      <div class="deux"><label>Prénom<input name="prenom" required></label><label>Nom<input name="nom"></label></div>
+      <div class="deux"><label>Téléphone<input name="telephone" type="tel" required></label><label>Commune<input name="commune" required placeholder="Manduel"></label></div>
+      <label>Intérêt<input name="interets" placeholder="Piscine, Maison fermée"></label>
+      <button class="principal">Enregistrer et attribuer</button>
+      <p class="message" id="m" role="status"></p>
+    </form>` : ''}`;
+  const f = document.getElementById('f-lead');
+  if (f) f.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const r = await api('lead_creer', { methode: 'POST', corps: Object.fromEntries(new FormData(f).entries()) });
+    const m = document.getElementById('m');
+    if (r.ok) { majAFaire(); aller('#/client/' + r.id); } else m.textContent = r.erreur === 'doublon' ? 'Ce numéro est déjà dans les fiches.' : 'Il faut au moins un prénom.';
+  });
+}
+
+/* ---------- Secteurs : quelle commune va à quelle agence, et à qui ---------- */
+
+async function vueSecteurs() {
+  vue().innerHTML = '<p class="chargement">Chargement…</p>';
+  const d = await api('secteurs');
+  if (!d.ok) return;
+  const sa = APP.utilisateur.role === 'superadmin';
+  const ligne = (s) => `<li class="demande secteur" data-commune="${echapper(s.libelle || s)}">
+      <span class="nom">${echapper(s.libelle || s)}</span>${s.libelle ? '' : ' <span class="pastille orange">sans secteur</span>'}
+      <div class="deux">
+        ${sa ? `<label>Agence<select name="agence_id">${d.agences.map((a) => `<option value="${a.id}"${s.agence_id === a.id ? ' selected' : ''}>${echapper(a.nom)}</option>`).join('')}</select></label>` : ''}
+        <label>Technicien attitré<select name="technicien_id"><option value="">Le moins chargé de l'agence</option>${d.techniciens.filter((t) => !sa || !s.agence_id || t.agence_id === s.agence_id).map((t) => `<option value="${t.id}"${s.technicien_id === t.id ? ' selected' : ''}>${echapper(t.nom)}</option>`).join('')}</select></label>
+      </div>
+      <div class="actions-ligne"><button class="secondaire" data-enregistrer>Enregistrer</button>${s.libelle ? '<button class="discret" data-retirer>Retirer le secteur</button>' : ''}</div>
+    </li>`;
+  vue().innerHTML = `
+    <h1>Secteurs</h1>
+    <p class="aide">Un lead qui arrive est confié selon sa commune : à l'agence du secteur, et au technicien attitré s'il y en a un, sinon au moins chargé. Une commune sans secteur tombe dans la première agence.</p>
+    <ul class="liste">${d.secteurs.map(ligne).join('')}${d.sans_secteur.map(ligne).join('')}</ul>
+    <form id="f-secteur" class="carte">
+      <h2>Ajouter une commune</h2>
+      <div class="deux"><label>Commune<input name="commune" required placeholder="Bouillargues"></label>
+        ${sa ? `<label>Agence<select name="agence_id">${d.agences.map((a) => `<option value="${a.id}">${echapper(a.nom)}</option>`).join('')}</select></label>` : ''}</div>
+      <button class="principal">Ajouter</button>
+    </form>
+    <p class="message" id="m" role="status"></p>`;
+  const m = document.getElementById('m');
+  const envoyer = async (corps) => { const r = await api('secteur_enregistrer', { methode: 'POST', corps }); if (r.ok) vueSecteurs(); else m.textContent = 'Pas enregistré : vérifiez la commune et l\'agence.'; };
+  vue().querySelectorAll('li.secteur').forEach((li) => {
+    const lire = () => ({ commune: li.dataset.commune, agence_id: li.querySelector('[name=agence_id]')?.value, technicien_id: li.querySelector('[name=technicien_id]').value });
+    li.querySelector('[data-enregistrer]').addEventListener('click', () => envoyer(lire()));
+    const r = li.querySelector('[data-retirer]');
+    if (r) r.addEventListener('click', () => envoyer({ ...lire(), supprimer: true }));
+    const sel = li.querySelector('[name=agence_id]');
+    if (sel) sel.addEventListener('change', () => {
+      const t = li.querySelector('[name=technicien_id]');
+      t.innerHTML = '<option value="">Le moins chargé de l\'agence</option>' + d.techniciens.filter((x) => x.agence_id === +sel.value).map((x) => `<option value="${x.id}">${echapper(x.nom)}</option>`).join('');
+    });
+  });
+  document.getElementById('f-secteur').addEventListener('submit', (ev) => { ev.preventDefault(); envoyer(Object.fromEntries(new FormData(ev.target).entries())); });
 }

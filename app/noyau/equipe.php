@@ -210,7 +210,7 @@ function a_invitation_accepter(): void
     $db = base();
     $db->beginTransaction();
     if ($i['genre'] === 'equipe') {
-        $db->prepare('UPDATE utilisateurs SET hash = ?, actif = 1 WHERE id = ?')->execute([hacher($mdp), $i['cible_id']]);
+        $db->prepare('UPDATE utilisateurs SET hash = ? WHERE id = ? AND actif = 1')->execute([hacher($mdp), $i['cible_id']]);
         $db->prepare('DELETE FROM sessions WHERE utilisateur_id = ?')->execute([$i['cible_id']]);
         $qui = 'membre ' . $i['cible_id'];
     } else {
@@ -249,6 +249,7 @@ function client_public(array $c): array
         'agence_id' => $c['agence_id'] !== null ? (int) $c['agence_id'] : null, 'technicien_id' => $c['technicien_id'] !== null ? (int) $c['technicien_id'] : null,
         'jour_passage' => $c['jour_passage'] !== null ? (int) $c['jour_passage'] : null, 'ordre' => (int) $c['ordre'], 'formule' => $c['formule'],
         'acces' => $c['acces'], 'lat' => $c['lat'] !== null ? (float) $c['lat'] : null, 'lon' => $c['lon'] !== null ? (float) $c['lon'] : null,
+        'lead_recu_le' => $c['lead_recu_le'], 'lead_attribue_le' => $c['lead_attribue_le'], 'lead_contacte_le' => $c['lead_contacte_le'], 'lead_contact_par' => $c['lead_contact_par'],
     ];
 }
 
@@ -376,6 +377,10 @@ function a_client_enregistrer(): void
     $c['lon'] = $geo ? $geo['lon'] : ($adresse_change ? null : $avant['lon']);
     $c['geo_score'] = $geo ? $geo['score'] : ($adresse_change ? null : $avant['geo_score']);
     $c['maj_le'] = maintenant();
+    if ($avant && $avant['lead_recu_le'] && !$avant['lead_attribue_le'] && $c['technicien_id']) {
+        $c['lead_attribue_le'] = maintenant();
+        notifier_technicien_lead((int) $c['technicien_id'], $id, $c + ['interets' => $c['offre']]);
+    }
     if ($avant) {
         $cols = implode(', ', array_map(fn ($k) => "$k = ?", array_keys($c)));
         $db->prepare("UPDATE clients SET $cols WHERE id = ?")->execute([...array_values($c), $id]);
@@ -422,7 +427,6 @@ function a_import_liste(): void
     $u = exiger_equipe(['chef', 'superadmin']);
     exiger_post();
     $db = base();
-    $agence = $u['role'] === 'superadmin' ? (int) $db->query('SELECT MIN(id) FROM agences')->fetchColumn() : (int) $u['agence_id'];
     $fichier = dirname(dossier_donnees()) . '/donnees-flamingo/liste-attente.csv';
     if (!is_file($fichier)) {
         sortir(200, ['ok' => true, 'ajoutes' => 0, 'deja' => 0]);
@@ -447,9 +451,14 @@ function a_import_liste(): void
             continue;
         }
         $n = fn ($v) => ltrim(texte($v, 200), "'");
-        $db->prepare("INSERT INTO clients (prenom, nom, telephone, courriel, commune, offre, notes, statut, origine, cree_le, maj_le, agence_id) VALUES (?,?,?,?,?,?,?, 'prospect', 'liste d''attente', ?, ?, ?)")
-            ->execute([$n($r['prenom'] ?? ''), $n($r['nom'] ?? ''), $n($r['telephone'] ?? ''), $n($r['courriel'] ?? ''), $n($r['commune'] ?? ''),
-                $n($r['interets'] ?? ''), 'Inscrit sur le site le ' . $n($r['date'] ?? ''), maintenant(), maintenant(), $agence]);
+        $recu = strtotime($n($r['date'] ?? ''));
+        $id = enregistrer_lead(['prenom' => $n($r['prenom'] ?? ''), 'nom' => $n($r['nom'] ?? ''), 'telephone' => $n($r['telephone'] ?? ''), 'courriel' => $n($r['courriel'] ?? ''),
+            'commune' => $n($r['commune'] ?? ''), 'interets' => $n($r['interets'] ?? ''), 'notes' => 'Inscrit sur le site le ' . $n($r['date'] ?? ''),
+            'recu_le' => $recu ? date('c', $recu) : null], 'liste d\'attente');
+        if ($id === null) {
+            $deja++;
+            continue;
+        }
         $ajoutes++;
     }
     fclose($f);
@@ -521,6 +530,7 @@ function a_visite_enregistrer(): void
         }
     }
     carnet_piscine_depuis_visite((int) $client['id'], $contenu, compter_alertes($contenu), $u['nom']);
+    marquer_lead_contacte((int) $client['id'], $u['nom']);
     // Les notes d'accès suivent le client d'une visite à l'autre.
     if (isset($d['acces']) && is_string($d['acces'])) {
         $db->prepare('UPDATE clients SET acces = ? WHERE id = ?')->execute([texte($d['acces'], 1000), $client['id']]);
@@ -975,8 +985,22 @@ function a_tableau(): void
             $detail[] = ['id' => (int) $m['id'], 'nom' => $m['nom'], 'clients' => (int) $x[0], 'visites_30j' => (int) $x[1], 'prevus' => (int) $x[2], 'faits' => (int) $x[3], 'duree_moyenne' => $x[4] !== null ? (int) round((float) $x[4]) : null];
         }
     }
+    $kpi = kpi_leads($w, $p, ($u['role'] === 'superadmin' && !$agence) ? 'agence' : 'technicien');
+    foreach ($detail as &$ligne) {
+        $ligne['leads'] = $kpi[(string) $ligne['id']] ?? ['recus' => 0, 'contactes' => 0, 'taux_reponse' => null, 'delai_moyen_h' => null, 'en_retard' => 0, 'devenus_clients' => 0];
+    }
+    unset($ligne);
+    [$leads30, $contactes30, $delai30, $retard, $sansTech] = $un("SELECT COUNT(*), SUM(c.lead_contacte_le IS NOT NULL),
+        AVG(CASE WHEN c.lead_contacte_le IS NOT NULL THEN (julianday(c.lead_contacte_le) - julianday(c.lead_attribue_le)) * 24 END),
+        SUM(c.lead_contacte_le IS NULL AND julianday('now') - julianday(COALESCE(c.lead_attribue_le, c.lead_recu_le)) > ?),
+        SUM(c.lead_contacte_le IS NULL AND c.technicien_id IS NULL)
+        FROM clients c WHERE $w AND c.lead_recu_le >= ?", [LEAD_RETARD_H / 24, ...$p, $il_y_a(30)]);
+    $totalLeads = (int) base()->query("SELECT COUNT(*) FROM clients WHERE lead_recu_le >= '" . $il_y_a(30) . "'")->fetchColumn();
     $sortie = [
         'ok' => true, 'agence' => $agence, 'statuts' => $statuts,
+        'leads' => ['recus_30j' => (int) $leads30, 'contactes_30j' => (int) $contactes30, 'taux_reponse' => $leads30 ? round($contactes30 / $leads30, 2) : null,
+            'delai_moyen_h' => $delai30 !== null ? round((float) $delai30, 1) : null, 'en_retard' => (int) $retard, 'sans_technicien' => (int) $sansTech,
+            'part_du_total' => $totalLeads ? round($leads30 / $totalLeads, 2) : null, 'retard_h' => LEAD_RETARD_H],
         'visites_30j' => (int) $v30, 'diagnostics_30j' => (int) $diag30, 'envoyes_30j' => (int) $env30, 'avec_points_30j' => (int) $alertes30,
         'mesurees_30j' => (int) $mesurees30, 'duree_passage_moyenne' => $duree30 !== null ? (int) round((float) $duree30) : null,
         'semaine' => ['prevus' => (int) $prevus, 'faits' => (int) $faits], 'demandes_en_attente' => (int) $attente,

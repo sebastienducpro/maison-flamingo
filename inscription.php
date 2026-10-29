@@ -140,7 +140,23 @@ if ($courriel !== '') {
 }
 $envoye = @mail(DESTINATAIRE, $sujet, $corps, implode("\r\n", $entetes), '-f' . DESTINATAIRE);
 
-if (!$envoye && !$archive) {
+// L'inscription entre aussi dans l'outil terrain : attribuée à une agence et un technicien
+// selon la commune, le chrono du premier contact démarre. Si l'outil n'est pas là, le site vit sans lui.
+$dans_outil = false;
+$noyau = __DIR__ . '/app/noyau/base.php';
+if (is_file($noyau)) {
+    try {
+        require_once $noyau;
+        require_once __DIR__ . '/app/noyau/acces.php';
+        require_once __DIR__ . '/app/noyau/leads.php';
+        $dans_outil = enregistrer_lead(['prenom' => $prenom, 'nom' => $nom, 'telephone' => $telephone, 'courriel' => $courriel,
+            'commune' => $commune, 'interets' => implode(', ', $interets), 'notes' => 'Inscrit sur le site le ' . $date . ', accord donné pour être recontacté.'], 'site') !== null;
+    } catch (Throwable $e) {
+        error_log('Flamingo inscription : ' . $e->getMessage());
+    }
+}
+
+if (!$envoye && !$archive && !$dans_outil) {
     repondre(500, ['ok' => false, 'erreur' => 'envoi']);
 }
 repondre(200, ['ok' => true]);

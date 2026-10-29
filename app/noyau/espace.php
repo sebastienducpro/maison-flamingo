@@ -91,6 +91,7 @@ function a_espace_demande(): void
     }
     $db->prepare('INSERT INTO demandes (client_id, texte, cree_le) VALUES (?,?,?)')->execute([$c['id'], $texte, maintenant()]);
     tracer('client ' . $c['id'], 'demande client');
+    notifier_chefs((int) $c['agence_id'], 'Demande de ' . $c['prenom'] . ' (' . $c['commune'] . ')', $texte . "\n\nÀ traiter depuis l'outil : " . url_base() . '/#/demandes');
     sortir(200, ['ok' => true]);
 }
 

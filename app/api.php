@@ -13,6 +13,7 @@ require __DIR__ . '/noyau/sauvegardes.php';
 require __DIR__ . '/noyau/equipe.php';
 require __DIR__ . '/noyau/espace.php';
 require __DIR__ . '/noyau/carnet.php';
+require __DIR__ . '/noyau/leads.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
@@ -31,7 +32,8 @@ const ACTIONS = [
     'sauvegardes', 'sauvegarde_lancer', 'sauvegarde_telecharger',
     'espace_etat', 'espace_connexion', 'espace_deconnexion', 'espace_accueil', 'espace_demande', 'espace_motdepasse',
     'carnet', 'carnet_poste', 'carnet_evenement', 'carnet_evenement_supprimer', 'carnet_equipement', 'carnet_equipement_supprimer',
-    'carnet_document', 'carnet_document_supprimer', 'document', 'espace_carnet', 'espace_creneau',
+    'carnet_document', 'carnet_document_supprimer', 'document', 'espace_carnet', 'espace_creneau', 'carnet_saison',
+    'leads', 'lead_contacte', 'lead_creer', 'secteurs', 'secteur_enregistrer', 'a_faire', 'motdepasse_oublie',
 ];
 
 $action = (string) ($_GET['action'] ?? '');
@@ -41,7 +43,7 @@ try {
         sortir(404, ['ok' => false, 'erreur' => 'action']);
     }
     // Filet de sauvegarde : si la copie quotidienne manque, l'équipe la déclenche sans le savoir.
-    if (!in_array($action, ['rapport', 'photo', 'etat', 'document'], true) && !str_starts_with($action, 'espace_') && session_equipe()) {
+    if (!in_array($action, ['rapport', 'photo', 'etat', 'document', 'a_faire'], true) && !str_starts_with($action, 'espace_') && session_equipe()) {
         sauvegarde_si_due();
     }
     ('a_' . $action)();
