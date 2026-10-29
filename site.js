@@ -1,8 +1,8 @@
 // Maison Flamingo · comportements du site, sans dépendance.
 
-// Adresse d'un service de formulaire (Tally, Formspree, n8n...). Tant qu'elle
-// est vide, l'inscription part par courriel : rien ne se perd, même sans serveur.
-const ADRESSE_FORMULAIRE = '';
+// L'inscription part vers inscription.php, qui l'envoie à contact@ et l'archive.
+// Si on vide cette adresse, le site repasse à l'ouverture de la messagerie du visiteur.
+const ADRESSE_FORMULAIRE = 'inscription.php';
 const COURRIEL_CONTACT = 'contact@maisonflamingo.fr';
 
 document.documentElement.classList.add('js');
@@ -72,21 +72,34 @@ if (form) {
       courriel: form.courriel.value.trim(),
       commune: form.commune.value,
       interets: [...form.querySelectorAll('input[name=interet]:checked')].map((c) => c.value),
-      date: new Date().toISOString(),
+      consentement: true,
+      site: form.site.value,
     };
 
     if (ADRESSE_FORMULAIRE) {
+      const bouton = form.querySelector('button[type=submit]');
+      bouton.disabled = true;
+      dire('Envoi en cours…');
       try {
         const rep = await fetch(ADRESSE_FORMULAIRE, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
           body: JSON.stringify(donnees),
         });
-        if (!rep.ok) throw new Error(String(rep.status));
-        form.reset();
-        dire('Merci ' + donnees.prenom + ', votre place est notée. Nous vous écrivons en mars.', 'ok');
+        if (rep.status === 429) {
+          dire('Plusieurs demandes viennent d\'arriver de chez vous : nous les avons bien. Réessayez dans une heure si besoin.', 'erreur');
+        } else if (rep.status === 422) {
+          dire('Un champ n\'est pas lisible : vérifiez votre téléphone et votre courriel.', 'erreur');
+        } else if (!rep.ok) {
+          throw new Error(String(rep.status));
+        } else {
+          form.reset();
+          dire('Merci ' + donnees.prenom + ', votre place est notée. Nous vous écrivons en mars.', 'ok');
+        }
       } catch (e) {
         dire('L\'envoi n\'a pas abouti. Écrivez-nous à ' + COURRIEL_CONTACT + ' ou au 06 74 85 90 78.', 'erreur');
+      } finally {
+        bouton.disabled = false;
       }
       return;
     }
