@@ -62,8 +62,8 @@ section[id]{scroll-margin-top:84px}
 .btn:hover{transform:translateY(-1px)}
 .btn-creme{background:var(--creme);color:var(--violet);box-shadow:0 10px 30px rgba(30,26,51,.35)}
 .btn-creme:hover{background:#fff}
-.btn-contour{border:1.5px solid rgba(247,242,234,.75);color:var(--creme)}
-.btn-contour:hover{background:rgba(247,242,234,.12)}
+.btn-contour{border:1.5px solid rgba(247,242,234,.85);color:var(--creme);background:rgba(30,26,51,.28);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+.btn-contour:hover{background:rgba(30,26,51,.45)}
 .btn-turquoise{background:var(--turquoise);color:#fff;width:100%;min-height:54px;font-size:16px}
 .btn-turquoise:hover{background:#155E58}
 .btn-nav{min-height:42px;padding:0 20px;font-size:14px;background:rgba(247,242,234,.14);color:var(--creme);border:1px solid rgba(247,242,234,.45)}
