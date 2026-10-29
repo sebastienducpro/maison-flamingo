@@ -225,6 +225,9 @@ section[id]{scroll-margin-top:84px}
 .territoire-phrase{font-family:var(--titre);font-weight:300;font-size:clamp(24px,3.2vw,40px);color:var(--creme);text-shadow:0 2px 20px rgba(30,26,51,.5)}
 .territoire-texte .territoire-legende{color:rgba(247,242,234,.75);margin-top:4px}
 
+.bande-piscine img{object-position:center 68%}
+.bande-piscine::after{background:linear-gradient(180deg,rgba(30,26,51,0) 70%,rgba(30,26,51,.35) 100%)}
+
 /* ---------- Fondateurs ---------- */
 .fondateurs{background:linear-gradient(120deg,#F28B9B 0%,#F6A57A 55%,#F9D29D 100%);color:var(--nuit);padding:88px 0}
 .fondateurs .surtitre{color:var(--prune)}
