@@ -50,11 +50,7 @@ section[id]{scroll-margin-top:84px}
 .logo-mots{display:flex;flex-direction:column;line-height:1}
 .logo-maison{font-family:var(--titre);font-size:10.5px;letter-spacing:.42em;text-transform:uppercase;color:var(--lagon)}
 .nav.colle .logo-maison{color:var(--turquoise)}
-.logo-flamingo{position:relative;font-family:var(--titre);font-size:24px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;margin-top:5px;--inline:rgba(30,26,51,.6)}
-/* Le double trait Art déco de la planche : le même mot en graisse fine, posé par-dessus en trait de la couleur du fond */
-.logo-flamingo::after{content:attr(data-mot);position:absolute;left:0;top:0;font-weight:200;color:transparent;-webkit-text-stroke:1px var(--inline);pointer-events:none}
-.nav.colle .logo-flamingo{--inline:var(--creme)}
-.logo-pied .logo-flamingo{--inline:#161220}
+.logo-flamingo{font-family:var(--titre);font-size:24px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;margin-top:5px}
 .nav-liens{display:flex;gap:30px}
 .nav-liens a{color:rgba(247,242,234,.88);text-decoration:none;font-size:14.5px;letter-spacing:.06em;transition:color .2s}
 .nav-liens a:hover{color:#fff}
