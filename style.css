@@ -66,7 +66,7 @@ section[id]{scroll-margin-top:84px}
 .btn-contour:hover{background:rgba(30,26,51,.45)}
 .btn-turquoise{background:var(--turquoise);color:#fff;width:100%;min-height:54px;font-size:16px}
 .btn-turquoise:hover{background:#155E58}
-.btn-nav{min-height:42px;padding:0 20px;font-size:14px;background:rgba(247,242,234,.14);color:var(--creme);border:1px solid rgba(247,242,234,.45)}
+.btn-nav{white-space:nowrap;min-height:42px;padding:0 20px;font-size:14px;background:rgba(247,242,234,.14);color:var(--creme);border:1px solid rgba(247,242,234,.45)}
 .nav.colle .btn-nav{background:var(--turquoise);color:#fff;border-color:var(--turquoise)}
 
 /* ---------- Le coucher de soleil ---------- */
@@ -96,8 +96,10 @@ section[id]{scroll-margin-top:84px}
 @keyframes miroiter{from{transform:translateX(-52%)}to{transform:translateX(-48%)}}
 
 .hero-grille{position:relative;z-index:2;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:56px;align-items:center}
-.hero-texte{display:flex;flex-direction:column;gap:26px;max-width:620px}
-.hero h1{font-size:clamp(46px,6.6vw,88px);line-height:.98;font-weight:200;text-shadow:0 2px 30px rgba(30,26,51,.35)}
+.hero-texte{display:flex;flex-direction:column;gap:26px;max-width:700px}
+/* La première ligne de la signature ne se coupe jamais : « plus » seul sur une ligne casse la phrase */
+.hero h1 .tenu{white-space:nowrap}
+.hero h1{font-size:clamp(34px,5vw,74px);line-height:.98;font-weight:200;text-shadow:0 2px 30px rgba(30,26,51,.35)}
 .hero h1 strong{font-weight:600;display:inline-block;background:linear-gradient(90deg,#FCE3AE,#F6A57A 45%,#F28B9B);-webkit-background-clip:text;background-clip:text;color:transparent}
 .hero-sous{font-size:19.5px;line-height:1.6;color:rgba(247,242,234,.92);max-width:540px;text-shadow:0 1px 16px rgba(30,26,51,.5)}
 .hero-actions{display:flex;flex-wrap:wrap;gap:14px}
@@ -295,6 +297,7 @@ legend{font-size:14px;font-weight:500;margin-bottom:6px;padding:0}
   .palmier-g2{display:none}
   .palmier-d{height:38%;right:-60px}
   .hero .surtitre{display:none}
+  .hero h1{font-size:38px}
   .hero-texte{gap:22px}
   .hero-sous{font-size:17.5px}
   .hero-actions .btn{width:100%}
