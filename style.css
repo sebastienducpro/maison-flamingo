@@ -155,7 +155,9 @@ section[id]{scroll-margin-top:84px}
 .offre{border-radius:4px;padding:42px 34px 34px;display:flex;flex-direction:column;gap:12px;position:relative}
 .offre-nom{font-family:var(--titre);font-size:13.5px;letter-spacing:.3em;text-transform:uppercase;font-weight:600;color:var(--turquoise)}
 .offre-accroche{font-family:var(--titre);font-size:21px;line-height:1.3;font-weight:300}
-.prix{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-top:8px}
+.tarif-fondateur{align-self:flex-start;margin-top:8px;font-family:var(--titre);font-size:11px;letter-spacing:.2em;text-transform:uppercase;font-weight:600;color:var(--rose-fonce);border:1px solid currentColor;border-radius:999px;padding:4px 10px}
+.offre-phare .tarif-fondateur{color:var(--rose)}
+.prix{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-top:2px}
 .prix-montant{font-family:var(--titre);font-size:56px;font-weight:600;line-height:1}
 .prix-unite{font-size:15px;color:var(--gris)}
 .prix-detail{font-size:14.5px;color:var(--gris)}
