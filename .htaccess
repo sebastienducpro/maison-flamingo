@@ -1,0 +1,2 @@
+# Les fichiers du dépôt qui ne sont pas le site restent invisibles en ligne.
+RedirectMatch 404 ^/(README\.md|\.gitignore|\.git/.*)$
