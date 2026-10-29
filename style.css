@@ -1,0 +1,313 @@
+/* Maison Flamingo · charte « sunset chic »
+   Rose flamant, turquoise lagune, crème, gris-bleu nuit ; l'orange sunset
+   n'existe que sur le site et le van, jamais sur les documents. */
+
+:root{
+  --rose:#F28B9B;
+  --rose-fonce:#E0607E;
+  --sunset:#F6A57A;
+  --or:#F9D29D;
+  --turquoise:#1F7A73;
+  --eau:#3FA69C;
+  --lagon:#8FD3CB;
+  --creme:#F7F2EA;
+  --creme-2:#FBF7F0;
+  --sable:#E6D9C6;
+  --encre:#1E2A2E;
+  --encre-2:#3A474C;
+  --gris:#5A676C;
+  --nuit:#1E1A33;
+  --prune:#3A2148;
+  --violet:#2A1D3D;
+  --titre:'Josefin Sans',system-ui,sans-serif;
+  --texte:'Jost',system-ui,sans-serif;
+  --rayon:22px;
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--creme);color:var(--encre);font-family:var(--texte);font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+h1,h2,h3{font-family:var(--titre);margin:0;font-weight:300;letter-spacing:-.005em}
+p{margin:0}
+a{color:var(--turquoise)}
+img,svg{display:block}
+section[id]{scroll-margin-top:84px}
+:focus-visible{outline:3px solid var(--rose);outline-offset:3px;border-radius:6px}
+
+.wrap{width:100%;max-width:1180px;margin:0 auto;padding:0 40px}
+.wrap.etroit{max-width:880px}
+
+/* ---------- Bandeau et navigation ---------- */
+.bandeau{background:var(--nuit);color:var(--or);text-align:center;font-family:var(--titre);font-size:12.5px;letter-spacing:.22em;text-transform:uppercase;padding:10px 16px}
+
+.nav{position:sticky;top:0;z-index:50;transition:background .35s ease,box-shadow .35s ease;background:transparent;margin-bottom:-80px}
+.nav-inner{display:flex;align-items:center;justify-content:space-between;gap:24px;height:80px}
+.nav.defile{background:rgba(30,26,51,.78);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.nav.colle{background:rgba(247,242,234,.93);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 1px 0 rgba(30,42,46,.08)}
+.logo{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--creme)}
+.nav.colle .logo{color:var(--encre)}
+.logo-flamant{width:30px;height:37px;color:var(--rose);stroke-width:2.6}
+.logo-mots{display:flex;flex-direction:column;line-height:1}
+.logo-maison{font-family:var(--titre);font-size:10.5px;letter-spacing:.42em;text-transform:uppercase;color:var(--lagon)}
+.nav.colle .logo-maison{color:var(--turquoise)}
+.logo-flamingo{font-family:var(--titre);font-size:22px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;margin-top:5px}
+.nav-liens{display:flex;gap:30px}
+.nav-liens a{color:rgba(247,242,234,.88);text-decoration:none;font-size:14.5px;letter-spacing:.06em;transition:color .2s}
+.nav-liens a:hover{color:#fff}
+.nav.colle .nav-liens a{color:var(--encre-2)}
+.nav.colle .nav-liens a:hover{color:var(--turquoise)}
+
+/* ---------- Boutons ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 26px;border-radius:999px;font-family:var(--texte);font-size:15.5px;font-weight:500;letter-spacing:.04em;text-decoration:none;border:0;cursor:pointer;transition:transform .2s ease,background .2s ease,color .2s ease,box-shadow .2s ease}
+.btn:hover{transform:translateY(-1px)}
+.btn-creme{background:var(--creme);color:var(--violet);box-shadow:0 10px 30px rgba(30,26,51,.35)}
+.btn-creme:hover{background:#fff}
+.btn-contour{border:1.5px solid rgba(247,242,234,.75);color:var(--creme)}
+.btn-contour:hover{background:rgba(247,242,234,.12)}
+.btn-turquoise{background:var(--turquoise);color:#fff;width:100%;min-height:54px;font-size:16px}
+.btn-turquoise:hover{background:#155E58}
+.btn-nav{min-height:42px;padding:0 20px;font-size:14px;background:rgba(247,242,234,.14);color:var(--creme);border:1px solid rgba(247,242,234,.45)}
+.nav.colle .btn-nav{background:var(--turquoise);color:#fff;border-color:var(--turquoise)}
+
+/* ---------- Le coucher de soleil ---------- */
+.hero{position:relative;min-height:max(720px,100svh);display:flex;align-items:center;overflow:hidden;color:var(--creme);padding:120px 0 21vh}
+.ciel{position:absolute;inset:0 0 18% 0;overflow:hidden;
+  background:linear-gradient(180deg,#1E1A33 0%,#2F1F45 22%,#5A2B5C 42%,#9A4569 58%,#D9667E 72%,#F28B9B 80%,#F6A57A 90%,#F9CF96 100%)}
+.etoiles{position:absolute;inset:0 0 50% 0;opacity:.55;
+  background-image:radial-gradient(1.2px 1.2px at 12% 18%,#fff 50%,transparent 51%),radial-gradient(1px 1px at 28% 8%,#fff 50%,transparent 51%),radial-gradient(1.4px 1.4px at 47% 22%,#fff 50%,transparent 51%),radial-gradient(1px 1px at 63% 12%,#fff 50%,transparent 51%),radial-gradient(1.2px 1.2px at 78% 26%,#fff 50%,transparent 51%),radial-gradient(1px 1px at 88% 9%,#fff 50%,transparent 51%),radial-gradient(1px 1px at 36% 34%,#fff 50%,transparent 51%),radial-gradient(1.3px 1.3px at 6% 40%,#fff 50%,transparent 51%)}
+.soleil{position:absolute;left:58%;bottom:0;width:min(560px,74vw);aspect-ratio:1;transform:translate(-50%,46%);border-radius:50%;
+  background:linear-gradient(180deg,#FCE3AE 0%,#F9C98C 30%,#F6A57A 55%,#F28B9B 78%,#E0607E 100%);
+  box-shadow:0 0 120px 30px rgba(249,201,140,.35);
+  -webkit-mask-image:linear-gradient(#000 0 30%,transparent 30%),repeating-linear-gradient(180deg,#000 0 26px,transparent 26px 34px);
+  mask-image:linear-gradient(#000 0 30%,transparent 30%),repeating-linear-gradient(180deg,#000 0 26px,transparent 26px 34px);
+  animation:lever 2.4s cubic-bezier(.2,.7,.2,1) both}
+@keyframes lever{from{transform:translate(-50%,70%);opacity:.4}to{transform:translate(-50%,46%);opacity:1}}
+.palmier{position:absolute;bottom:-6px;color:#1A1328;filter:drop-shadow(0 0 1px rgba(26,19,40,.6))}
+.palmier-g{left:-60px;height:80%;opacity:.96}
+.palmier-g2{left:30px;height:44%;opacity:.7;transform:scaleX(-1)}
+.palmier-d{right:-70px;height:72%;opacity:.96;transform:scaleX(-1)}
+.eau{position:absolute;left:0;right:0;bottom:0;height:18%;overflow:hidden;
+  background:linear-gradient(180deg,#3F8F8E 0%,#2B7B7A 25%,#1F5F66 60%,#173F4E 100%)}
+.eau::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(180deg,rgba(255,255,255,.07) 0 2px,transparent 2px 9px)}
+.reflet{position:absolute;left:58%;top:0;width:min(560px,74vw);height:100%;transform:translateX(-50%);
+  background:repeating-linear-gradient(180deg,rgba(249,201,140,.75) 0 3px,transparent 3px 11px);
+  -webkit-mask-image:radial-gradient(50% 100% at 50% 0,#000 0%,transparent 70%);mask-image:radial-gradient(50% 100% at 50% 0,#000 0%,transparent 70%);
+  animation:miroiter 6s ease-in-out infinite alternate}
+@keyframes miroiter{from{transform:translateX(-52%)}to{transform:translateX(-48%)}}
+
+.hero-grille{position:relative;z-index:2;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:56px;align-items:center}
+.hero-texte{display:flex;flex-direction:column;gap:26px;max-width:620px}
+.hero h1{font-size:clamp(46px,6.6vw,88px);line-height:.98;font-weight:200;text-shadow:0 2px 30px rgba(30,26,51,.35)}
+.hero h1 strong{font-weight:600;display:inline-block;background:linear-gradient(90deg,#FCE3AE,#F6A57A 45%,#F28B9B);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero-sous{font-size:19.5px;line-height:1.6;color:rgba(247,242,234,.92);max-width:540px;text-shadow:0 1px 16px rgba(30,26,51,.5)}
+.hero-actions{display:flex;flex-wrap:wrap;gap:14px}
+.hero-zone{font-size:13.5px;letter-spacing:.08em;color:var(--creme);text-shadow:0 1px 12px rgba(30,26,51,.55)}
+
+/* La carte de passage, posée sur la table */
+.carte-passage{margin:0;justify-self:end;width:100%;max-width:380px;background:var(--creme-2);color:var(--encre);border-radius:18px;padding:28px 28px 22px;
+  box-shadow:0 30px 70px rgba(20,14,35,.45);transform:rotate(-2.5deg);position:relative;animation:poser 1.4s .5s cubic-bezier(.2,.7,.2,1) both}
+.carte-passage::before{content:"";position:absolute;inset:8px;border:1px solid var(--sable);border-radius:12px;pointer-events:none}
+@keyframes poser{from{opacity:0;transform:translateY(30px) rotate(2deg)}to{opacity:1;transform:rotate(-2.5deg)}}
+.carte-entete{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.carte-entete svg{width:20px;height:25px;color:var(--rose);stroke-width:2.8}
+.carte-entete span{font-family:var(--titre);font-size:12px;letter-spacing:.3em;text-transform:uppercase;color:var(--turquoise)}
+.carte-ligne{font-size:21px;line-height:1.35;font-style:italic}
+.carte-ok{font-weight:600;margin:4px 0 16px}
+.carte-liste{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;font-size:14.5px;color:var(--encre-2)}
+.carte-liste li{display:flex;gap:10px;align-items:flex-start}
+.carte-liste li::before{content:"✓";flex:none;width:18px;height:18px;margin-top:3px;border-radius:50%;background:var(--eau);color:#fff;font-size:11px;display:inline-flex;align-items:center;justify-content:center}
+.carte-pied{display:flex;justify-content:space-between;align-items:flex-end;margin-top:18px;font-size:13px;color:var(--gris)}
+.signature{font-family:var(--titre);font-size:15px;color:var(--encre);font-style:italic}
+.signature::before{content:"— "}
+
+/* La bande du van : rose, sunset, lagune */
+.bande-sunset{height:9px;background:linear-gradient(180deg,var(--rose) 0 33.3%,var(--sunset) 33.3% 66.6%,var(--eau) 66.6% 100%)}
+
+/* ---------- Preuves ---------- */
+.preuves{background:var(--encre);color:var(--creme)}
+.preuves-grille{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:32px;padding-top:40px;padding-bottom:40px}
+.preuves-grille div{display:flex;flex-direction:column;gap:6px;font-size:15px;color:#C9D1D3;line-height:1.45}
+.chiffre{font-family:var(--titre);font-size:42px;font-weight:600;color:var(--rose);line-height:1.1}
+
+/* ---------- Sections ---------- */
+.section{padding:104px 0}
+.creme{background:var(--creme)}
+.blanc{background:#fff}
+.offres-fond{background:linear-gradient(180deg,var(--creme) 0%,var(--creme-2) 100%)}
+.surtitre{font-family:var(--titre);font-size:12.5px;letter-spacing:.32em;text-transform:uppercase;color:var(--turquoise);display:flex;align-items:center;gap:14px;margin-bottom:16px}
+.surtitre::before{content:"";width:28px;height:1px;background:currentColor;opacity:.6}
+.surtitre-clair{color:var(--or)}
+.section h2{font-size:clamp(32px,4vw,48px);line-height:1.1;max-width:780px;margin-bottom:20px}
+.intro{font-size:18.5px;line-height:1.65;color:var(--encre-2);max-width:680px}
+.intro-clair{color:rgba(247,242,234,.85)}
+
+/* L'encadré Art déco : un double filet, sans ornement de plus */
+.deco{background:#fff;border:1px solid var(--sable);outline:1px solid var(--sable);outline-offset:-9px}
+
+.etapes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:26px;margin-top:48px}
+.etape{border-radius:4px;padding:40px 34px 36px;display:flex;flex-direction:column;gap:14px}
+.numero{font-family:var(--titre);font-size:30px;font-weight:200;color:var(--rose);letter-spacing:.1em}
+.etape h3{font-size:23px;font-weight:600}
+.etape p{color:var(--encre-2);font-size:16px}
+
+/* ---------- Offres ---------- */
+.offres{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;margin-top:52px;align-items:stretch}
+.offre{border-radius:4px;padding:42px 34px 34px;display:flex;flex-direction:column;gap:12px;position:relative}
+.offre-nom{font-family:var(--titre);font-size:13.5px;letter-spacing:.3em;text-transform:uppercase;font-weight:600;color:var(--turquoise)}
+.offre-accroche{font-family:var(--titre);font-size:21px;line-height:1.3;font-weight:300}
+.prix{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-top:8px}
+.prix-montant{font-family:var(--titre);font-size:56px;font-weight:600;line-height:1}
+.prix-unite{font-size:15px;color:var(--gris)}
+.prix-detail{font-size:14.5px;color:var(--gris)}
+.liste-offre{list-style:none;margin:10px 0 0;padding:16px 0 0;border-top:1px solid var(--sable);display:flex;flex-direction:column;gap:11px;font-size:15.5px;line-height:1.5;color:var(--encre-2);flex:1}
+.liste-offre li{padding-left:22px;position:relative}
+.liste-offre li::before{content:"";position:absolute;left:0;top:.62em;width:9px;height:9px;border-radius:50%;background:var(--rose)}
+.offre-pour{font-size:13.5px;color:var(--gris);font-style:italic;margin-top:10px}
+.offre-phare{background:linear-gradient(180deg,var(--violet) 0%,var(--nuit) 100%);color:var(--creme);border-radius:4px;overflow:hidden;box-shadow:0 30px 60px rgba(30,26,51,.25)}
+.offre-phare::before{content:"";position:absolute;left:0;right:0;top:0;height:9px;background:linear-gradient(180deg,var(--rose) 0 33.3%,var(--sunset) 33.3% 66.6%,var(--eau) 66.6% 100%)}
+.offre-phare .offre-nom{color:var(--lagon)}
+.offre-phare .prix-unite,.offre-phare .prix-detail,.offre-phare .offre-pour{color:#C9C2D6}
+.offre-phare .liste-offre{color:#E8E4EE;border-top-color:rgba(255,255,255,.14)}
+.offre-phare .prix-montant{background:linear-gradient(90deg,#FCE3AE,#F6A57A,#F28B9B);-webkit-background-clip:text;background-clip:text;color:transparent}
+.pastille{align-self:flex-start;margin-bottom:4px;font-family:var(--titre);font-size:11px;letter-spacing:.2em;text-transform:uppercase;padding:7px 12px;border-radius:999px;background:var(--rose);color:var(--nuit);font-weight:600}
+.mention-prix{margin-top:28px;font-size:14px;color:var(--gris);text-align:center}
+
+/* ---------- Rapport ---------- */
+.rapport-grille{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:72px;align-items:center}
+.puces{list-style:none;margin:28px 0 0;padding:0;display:flex;flex-direction:column;gap:14px;color:var(--encre-2)}
+.puces li{padding-left:24px;position:relative}
+.puces li::before{content:"";position:absolute;left:0;top:.6em;width:8px;height:8px;border-radius:50%;background:var(--rose)}
+.telephone{justify-self:center;width:100%;max-width:360px;padding:14px;border-radius:44px;background:linear-gradient(160deg,#2A1D3D,#1E1A33);box-shadow:0 40px 80px rgba(30,26,51,.28)}
+.tel-ecran{background:var(--creme);border-radius:32px;padding:26px 20px 22px;display:flex;flex-direction:column;gap:14px}
+.tel-entete{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:12.5px;color:var(--gris)}
+.tel-entete span:first-child{font-family:var(--titre);letter-spacing:.2em;text-transform:uppercase;color:var(--turquoise);font-size:11px}
+.tel-photos{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ph{height:96px;border-radius:12px}
+.ph-eau{background:linear-gradient(180deg,#8FD3CB,#3FA69C)}
+.ph-local{background:linear-gradient(180deg,#C9D1D3,#8A9598)}
+.ph-terrasse{background:linear-gradient(180deg,#F6B6A0,#F28B9B)}
+.ph-volets{background:linear-gradient(180deg,#EDE4D6,#D9CDB9)}
+.tel-mesures{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.tel-mesures div{background:#fff;border-radius:12px;padding:10px 12px;display:flex;flex-direction:column}
+.tel-mesures span{font-size:11.5px;color:var(--gris)}
+.tel-mesures strong{font-family:var(--titre);font-size:22px;font-weight:600}
+.tel-remarque{background:#fff;border-radius:12px;padding:12px 14px;font-size:14px;line-height:1.5;color:var(--encre-2)}
+
+/* ---------- Objets ---------- */
+.nuit{background:radial-gradient(120% 90% at 50% 120%,#5A2B5C 0%,var(--violet) 45%,var(--nuit) 100%);color:var(--creme)}
+.objets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px;margin-top:52px}
+.objet{border:1px solid rgba(249,210,157,.28);outline:1px solid rgba(249,210,157,.28);outline-offset:-9px;padding:40px 32px 34px;display:flex;flex-direction:column;gap:14px}
+.objet-dessin{width:76px;height:60px;fill:none;stroke:var(--rose);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;margin-bottom:8px;color:var(--rose)}
+.objet-flamant{width:48px;height:60px;stroke-width:1.6;--eau:var(--lagon)}
+.objet h3{font-size:21px;font-weight:600;color:var(--or)}
+.objet p{color:rgba(247,242,234,.82);font-size:16px}
+
+/* ---------- Fondateurs ---------- */
+.fondateurs{background:linear-gradient(120deg,#F28B9B 0%,#F6A57A 55%,#F9D29D 100%);color:var(--nuit);padding:88px 0}
+.fondateurs .surtitre{color:var(--prune)}
+.fondateurs h2{margin-bottom:0}
+.fondateurs-grille{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:56px;align-items:center}
+.avantages{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px}
+.avantages li{background:rgba(255,255,255,.72);border-radius:14px;padding:18px 22px;display:flex;flex-direction:column;gap:2px}
+.avantages strong{font-family:var(--titre);font-size:19px;font-weight:600}
+.avantages span{font-size:15px;color:var(--encre-2)}
+
+/* ---------- Questions ---------- */
+.faq{margin-top:40px;border-top:1px solid var(--sable)}
+.faq details{border-bottom:1px solid var(--sable)}
+.faq summary{cursor:pointer;list-style:none;padding:22px 44px 22px 0;font-family:var(--titre);font-size:20px;font-weight:400;position:relative}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"+";position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:26px;font-weight:200;color:var(--rose);transition:transform .25s}
+.faq details[open] summary::after{transform:translateY(-50%) rotate(45deg)}
+.faq details p{padding:0 0 24px;color:var(--encre-2);max-width:740px}
+
+/* ---------- Liste d'attente ---------- */
+.liste{background:linear-gradient(180deg,var(--nuit) 0%,var(--violet) 60%,var(--prune) 100%);color:var(--creme)}
+.liste-grille{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:64px;align-items:start}
+.petit-clair{margin-top:18px;font-size:15px;color:rgba(247,242,234,.6)}
+.formulaire{background:var(--creme);color:var(--encre);border-radius:var(--rayon);padding:34px;display:flex;flex-direction:column;gap:16px;box-shadow:0 30px 70px rgba(10,8,20,.4)}
+.champs-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.formulaire label{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:500}
+.facultatif{font-weight:400;color:var(--gris);font-size:12.5px}
+.formulaire input[type=text],.formulaire input[type=tel],.formulaire input[type=email],.formulaire select{min-height:48px;border:1px solid #D9CDB9;border-radius:10px;padding:0 14px;font-size:16px;font-family:inherit;background:#fff;color:var(--encre);width:100%}
+.formulaire input:focus,.formulaire select:focus{outline:2px solid var(--rose);outline-offset:1px;border-color:transparent}
+.formulaire .invalide{border-color:var(--rose-fonce);background:#FFF5F6}
+fieldset{border:0;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:4px 22px}
+legend{font-size:14px;font-weight:500;margin-bottom:6px;padding:0}
+.formulaire label.case{flex-direction:row;align-items:center;gap:10px;font-weight:400;font-size:15px;min-height:40px}
+.case input{width:19px;height:19px;accent-color:var(--turquoise);flex:none}
+.formulaire label.consentement{align-items:flex-start;font-size:13px;line-height:1.5;color:var(--encre-2)}
+.consentement input{margin-top:2px}
+.piege{position:absolute!important;left:-9999px!important;width:1px;height:1px;overflow:hidden}
+.form-message{font-size:14.5px;min-height:1.2em}
+.form-message.ok{color:var(--turquoise);font-weight:500}
+.form-message.erreur{color:var(--rose-fonce)}
+
+/* ---------- Pied ---------- */
+.pied{background:#161220;color:#C9C2D6}
+.pied-grille{display:flex;justify-content:space-between;align-items:center;gap:28px;flex-wrap:wrap;padding-top:40px;padding-bottom:20px}
+.logo-pied{color:var(--creme)}
+.pied-liens{display:flex;gap:26px;flex-wrap:wrap;font-size:14.5px}
+.pied-liens a{color:#C9C2D6;text-decoration:none}
+.pied-liens a:hover{color:var(--rose)}
+.pied-bas{font-size:13px;color:#8C8499;padding-bottom:36px}
+
+/* ---------- Apparition au défilement (seulement si le script tourne) ---------- */
+.js .revele{opacity:0;transform:translateY(22px);transition:opacity .8s ease,transform .8s cubic-bezier(.2,.7,.2,1)}
+.js .revele.vu{opacity:1;transform:none}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  .js .revele{opacity:1;transform:none}
+  html{scroll-behavior:auto}
+}
+
+/* ---------- Écrans moyens ---------- */
+@media (max-width:1020px){
+  .nav-liens{display:none}
+  .palmier-g{opacity:.55}
+  .palmier-g2{display:none}
+  .hero-grille{grid-template-columns:1fr;gap:44px}
+  .carte-passage{justify-self:start}
+  .etapes,.objets{grid-template-columns:1fr}
+  .offres{grid-template-columns:1fr;max-width:560px;margin-left:auto;margin-right:auto}
+  .rapport-grille,.fondateurs-grille,.liste-grille{grid-template-columns:1fr;gap:44px}
+  .preuves-grille{grid-template-columns:1fr 1fr}
+}
+
+/* ---------- Téléphone ---------- */
+@media (max-width:640px){
+  body{font-size:16px}
+  .wrap{padding:0 16px}
+  .bandeau{font-size:10.5px;letter-spacing:.14em}
+  .nav{margin-bottom:-68px}
+  .nav-inner{height:68px}
+  .logo-flamingo{font-size:18px}
+  .btn-nav{padding:0 14px;font-size:13px;min-height:38px}
+  .hero{min-height:auto;padding:104px 0 150px}
+  .ciel{inset:0 0 120px 0}
+  .eau{height:120px}
+  .soleil{left:62%;width:min(420px,96vw)}
+  .reflet{left:62%;width:min(420px,96vw)}
+  .palmier-g{height:44%;left:-50px}
+  .palmier-g2{display:none}
+  .palmier-d{height:38%;right:-60px}
+  .hero .surtitre{display:none}
+  .hero-texte{gap:22px}
+  .hero-sous{font-size:17.5px}
+  .hero-actions .btn{width:100%}
+  .carte-passage{max-width:none;padding:24px 22px 20px}
+  .carte-ligne{font-size:19px}
+  .section{padding:72px 0}
+  .etape,.offre,.objet{padding:34px 24px 28px}
+  .prix-montant{font-size:48px}
+  .formulaire{padding:24px 18px}
+  .champs-2{grid-template-columns:1fr}
+  .faq summary{font-size:18px}
+  .pied-grille{flex-direction:column;align-items:flex-start}
+}
+
+/* ---------- Mentions légales ---------- */
+.page-legale .section{min-height:100vh}
+.legal h3{font-family:var(--titre);font-size:20px;font-weight:600;margin:34px 0 10px}
+.legal p{color:var(--encre-2);margin-bottom:10px}

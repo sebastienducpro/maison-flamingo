@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maison Flamingo · Votre maison, vue chaque semaine</title>
+<meta name="description" content="Entretien de piscine chaque semaine et veille de maison fermée, autour de Nîmes. Le même technicien, le même jour, et un rapport photo après chaque passage. Ouverture au printemps 2027.">
+<meta name="theme-color" content="#2A1D3D">
+<meta property="og:title" content="Maison Flamingo · Votre maison, vue chaque semaine">
+<meta property="og:description" content="Piscine et maison veillées chaque semaine autour de Nîmes. 25 places fondateurs pour le printemps 2027.">
+<meta property="og:locale" content="fr_FR">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@200;300;400;600;700&family=Jost:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=7">
+</head>
+<body>
+
+<!-- Le symbole est déclaré une fois et réutilisé partout : un seul dessin à faire vectoriser -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="flamant" viewBox="0 0 36 44">
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 42 V26" stroke="currentColor"/>
+      <path d="M14 26 C6 26 5 16 13 13 C19 11 22 15 22 19 C22 24 19 26 14 26 Z" stroke="currentColor"/>
+      <path d="M21 16 C21 9 26 4 31 5 C34 6 33 9 30 9 C27 9 26 12 26 15" stroke="currentColor"/>
+      <path d="M31 5 L34 7" stroke="currentColor"/>
+      <path d="M4 42 H24" stroke="var(--eau, #3FA69C)"/>
+    </g>
+  </symbol>
+  <symbol id="palmier" viewBox="0 0 220 420">
+    <g fill="currentColor">
+      <path d="M84 420 C86 330 92 240 104 170 C110 134 115 114 118 100 L125 102 C122 118 118 138 114 172 C104 242 100 330 102 420 Z"/>
+      <path d="M120 98 C92 66 50 62 8 92 C48 76 88 80 118 104 Z"/>
+      <path d="M120 96 C108 58 78 34 36 30 C72 44 98 66 116 100 Z"/>
+      <path d="M121 96 C126 54 148 28 186 20 C156 40 136 64 125 100 Z"/>
+      <path d="M122 98 C154 74 190 78 214 108 C184 92 152 92 124 104 Z"/>
+      <path d="M122 102 C152 108 172 132 176 168 C162 140 144 122 120 108 Z"/>
+      <path d="M118 102 C92 112 74 136 70 172 C86 144 102 126 122 108 Z"/>
+      <path d="M120 96 C112 66 114 40 128 12 C126 42 126 70 124 98 Z"/>
+      <circle cx="116" cy="104" r="5"/><circle cx="124" cy="108" r="4.5"/><circle cx="112" cy="110" r="4"/>
+    </g>
+    <path d="M88 390 Q94.5 395 101 390" fill="none" stroke="rgba(0,0,0,.25)" stroke-width="1.5"/><path d="M89 350 Q95.5 355 102 350" fill="none" stroke="rgba(0,0,0,.25)" stroke-width="1.5"/><path d="M90 310 Q96.5 315 103 310" fill="none" stroke="rgba(0,0,0,.25)" stroke-width="1.5"/><path d="M92 270 Q98.5 275 105 270" fill="none" stroke="rgba(0,0,0,.25)" stroke-width="1.5"/><path d="M95 230 Q101.5 235 108 230" fill="none" stroke="rgba(0,0,0,.25)" stroke-width="1.5"/><path d="M99 190 Q105.0 195 111 190" fill="none" stroke="rgba(0,0,0,.25)" stroke-width="1.5"/><path d="M104 150 Q109.5 155 115 150" fill="none" stroke="rgba(0,0,0,.25)" stroke-width="1.5"/>
+  </symbol>
+</svg>
+
+<div class="bandeau">Ouverture printemps 2027 · Nîmes et alentours · 25 places fondateurs</div>
+
+<header class="nav" id="nav">
+  <div class="wrap nav-inner">
+    <a href="#haut" class="logo" aria-label="Maison Flamingo, retour en haut">
+      <svg class="logo-flamant" viewBox="0 0 36 44" aria-hidden="true"><use href="#flamant"/></svg>
+      <span class="logo-mots"><span class="logo-maison">Maison</span><span class="logo-flamingo">Flamingo</span></span>
+    </a>
+    <nav class="nav-liens" aria-label="Navigation principale">
+      <a href="#offres">Les offres</a>
+      <a href="#comment">Comment ça marche</a>
+      <a href="#rapport">Le rapport</a>
+      <a href="#questions">Questions</a>
+    </nav>
+    <a href="#liste" class="btn btn-nav">Réserver ma place</a>
+  </div>
+</header>
+
+<main id="haut">
+
+  <!-- Le coucher de soleil : le ciel, le soleil rayé, les palmiers, et l'eau qui le reflète -->
+  <section class="hero">
+    <div class="ciel" aria-hidden="true">
+      <div class="etoiles"></div>
+      <div class="soleil"></div>
+      <svg class="palmier palmier-g" viewBox="0 0 220 420"><use href="#palmier"/></svg>
+      <svg class="palmier palmier-g2" viewBox="0 0 220 420"><use href="#palmier"/></svg>
+      <svg class="palmier palmier-d" viewBox="0 0 220 420"><use href="#palmier"/></svg>
+    </div>
+    <div class="eau" aria-hidden="true"><div class="reflet"></div></div>
+
+    <div class="wrap hero-grille">
+      <div class="hero-texte">
+        <p class="surtitre surtitre-clair">Piscine · Maison · Nîmes et alentours</p>
+        <h1>Votre maison,<br><strong>vue chaque semaine.</strong></h1>
+        <p class="hero-sous">Le même technicien, le même jour, toute l'année. Après chaque passage, un rapport photo sur votre téléphone. Vous n'y pensez plus : quelqu'un y pense pour vous.</p>
+        <div class="hero-actions">
+          <a href="#liste" class="btn btn-creme">Réserver ma place fondateur</a>
+          <a href="#offres" class="btn btn-contour">Voir les prix</a>
+        </div>
+        <p class="hero-zone">Manduel · Bouillargues · Marguerittes · Caissargues · Rodilhan · Garons · Nîmes</p>
+      </div>
+
+      <figure class="carte-passage" aria-label="Exemple de carte laissée après un passage">
+        <div class="carte-entete">
+          <svg viewBox="0 0 36 44" aria-hidden="true"><use href="#flamant"/></svg>
+          <span>Maison Flamingo</span>
+        </div>
+        <p class="carte-ligne">Votre Flamingo est passé jeudi 12 juin, à 10 h 40.</p>
+        <p class="carte-ligne carte-ok">Tout est en ordre.</p>
+        <ul class="carte-liste">
+          <li>pH 7,2 · chlore 1,5 mg/L · filtration en marche</li>
+          <li>Paniers vidés, ligne d'eau brossée</li>
+          <li>Volets, portail, courrier : rien à signaler</li>
+        </ul>
+        <figcaption class="carte-pied"><span>4 photos jointes</span><span class="signature">votre Flamingo</span></figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <div class="bande-sunset" aria-hidden="true"></div>
+
+  <section class="preuves" aria-label="Nos engagements">
+    <div class="wrap preuves-grille">
+      <div><span class="chiffre">36</span><span>passages par an pour votre piscine, à jour fixe</span></div>
+      <div><span class="chiffre">1</span><span>seul technicien, qui connaît votre portail et votre pompe</span></div>
+      <div><span class="chiffre">&lt;&nbsp;1&nbsp;h</span><span>entre le passage et le rapport photo sur votre téléphone</span></div>
+      <div><span class="chiffre">0</span><span>vente forcée. On signale, on propose, vous décidez.</span></div>
+    </div>
+  </section>
+
+  <section class="section creme" id="comment">
+    <div class="wrap">
+      <p class="surtitre">Comment ça marche</p>
+      <h2>Trois gestes, et vous n'y pensez plus.</h2>
+      <div class="etapes">
+        <article class="etape deco revele">
+          <span class="numero">01</span>
+          <h3>Un diagnostic offert</h3>
+          <p>Vingt minutes chez vous : test de l'eau, photos du local technique, tour de la maison. Vous recevez votre premier rapport dans l'heure, avant d'avoir signé quoi que ce soit.</p>
+        </article>
+        <article class="etape deco revele">
+          <span class="numero">02</span>
+          <h3>Votre jour, votre Flamingo</h3>
+          <p>On fixe ensemble le jour et le créneau. Vous rencontrez votre technicien : c'est lui, et lui seul, qui viendra chaque semaine. Chaque prise et chaque remise de vos clés est enregistrée.</p>
+        </article>
+        <article class="etape deco revele">
+          <span class="numero">03</span>
+          <h3>Un rapport après chaque passage</h3>
+          <p>Photos, mesures, ce qui a été fait, ce qu'on a remarqué. Sur votre téléphone avant que le van ait quitté la rue, et une carte signée sur la table de la cuisine.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section offres-fond" id="offres">
+    <div class="wrap">
+      <p class="surtitre">Les offres</p>
+      <h2>Des prix affichés, tout compris, les mêmes pour tous.</h2>
+      <p class="intro">Produits, remise en route, hivernage et rapports sont compris. Pas de supplément à la fin de l'été, pas de « on verra sur place ».</p>
+
+      <div class="offres">
+        <article class="offre deco revele">
+          <p class="offre-nom">Piscine</p>
+          <p class="offre-accroche">Votre bassin, sans y penser.</p>
+          <p class="prix"><span class="prix-montant">149&nbsp;€</span><span class="prix-unite">par mois, lissé sur l'année</span></p>
+          <p class="prix-detail">Moins de 50 € le passage, produits compris.</p>
+          <ul class="liste-offre">
+            <li>Chaque semaine d'avril à octobre, tous les quinze jours en mars et novembre</li>
+            <li>Remise en route au printemps, hivernage à l'automne</li>
+            <li>Analyse de l'eau, produits et dosage compris</li>
+            <li>Brossage, aspiration, paniers, filtre et pompe vérifiés</li>
+            <li>Un rapport photo après chaque passage</li>
+          </ul>
+          <p class="offre-pour">Pour toute maison avec piscine, habitée ou non.</p>
+        </article>
+
+        <article class="offre offre-phare revele">
+          <span class="pastille">La maison entière</span>
+          <p class="offre-nom">Piscine + Maison fermée</p>
+          <p class="offre-accroche">Votre maison et votre piscine, dans la même visite.</p>
+          <p class="prix"><span class="prix-montant">179&nbsp;€</span><span class="prix-unite">par mois</span></p>
+          <p class="prix-detail">Au lieu de 198 €. La remise, c'est le trajet économisé, jamais le temps passé chez vous.</p>
+          <ul class="liste-offre">
+            <li>Tout Piscine, tout Maison fermée</li>
+            <li>Un tour de la maison à chaque passage piscine</li>
+            <li>La maison prête avant votre arrivée</li>
+            <li>Le bilan de l'année en novembre, en photos</li>
+          </ul>
+          <p class="offre-pour">Pour une maison avec piscine, fermée une partie de l'année.</p>
+        </article>
+
+        <article class="offre deco revele">
+          <p class="offre-nom">Maison fermée</p>
+          <p class="offre-accroche">Quelqu'un entre chez vous, et vous le prouve.</p>
+          <p class="prix"><span class="prix-montant">49&nbsp;€</span><span class="prix-unite">par mois, sans engagement</span></p>
+          <p class="prix-detail">Pour la maison vide une partie de l'année.</p>
+          <ul class="liste-offre">
+            <li>Une visite complète chaque mois : compteurs, robinets, humidité, volets, courrier, aération</li>
+            <li>Un passage après chaque coup de vent ou épisode cévenol</li>
+            <li>Sur demande, la maison prête avant votre arrivée</li>
+            <li>Un rapport photo et une carte signée à chaque visite</li>
+          </ul>
+          <p class="offre-pour">Pour une résidence secondaire, avec ou sans jardin.</p>
+        </article>
+      </div>
+      <p class="mention-prix">Prix TTC par mois. Piscine : contrat annuel, résiliable à date anniversaire. Les 25 fondateurs sont sans engagement la première saison.</p>
+    </div>
+  </section>
+
+  <section class="section blanc" id="rapport">
+    <div class="wrap rapport-grille">
+      <div class="revele">
+        <p class="surtitre">Le rapport Flamingo</p>
+        <h2>À 600 km, vous savez ce qui s'est passé chez vous.</h2>
+        <p class="intro">Un pisciniste passe quand il peut. Votre Flamingo passe le jeudi, et vous le montre. Chaque rapport garde les photos, les mesures et les remarques de votre technicien. En novembre, le bilan de l'année : tous vos passages, ce qui a été fait, ce qui a été évité.</p>
+        <ul class="puces">
+          <li>Photos datées et heurées, à chaque passage</li>
+          <li>L'historique de votre eau : pH, chlore, température, semaine après semaine</li>
+          <li>Après un coup de vent, on passe, et vous recevez les photos sans avoir rien demandé</li>
+        </ul>
+      </div>
+      <div class="telephone revele" aria-label="Exemple de rapport de passage">
+        <div class="tel-ecran">
+          <div class="tel-entete">
+            <span>Rapport de passage</span>
+            <span>jeu. 12 juin · 10 h 40</span>
+          </div>
+          <div class="tel-photos" aria-hidden="true">
+            <span class="ph ph-eau"></span><span class="ph ph-local"></span>
+            <span class="ph ph-terrasse"></span><span class="ph ph-volets"></span>
+          </div>
+          <div class="tel-mesures">
+            <div><span>pH</span><strong>7,2</strong></div>
+            <div><span>Chlore</span><strong>1,5</strong></div>
+            <div><span>Eau</span><strong>27°</strong></div>
+          </div>
+          <p class="tel-remarque"><strong>Remarque de votre Flamingo :</strong> le joint du skimmer côté terrasse commence à fatiguer. Rien d'urgent, je garde un œil dessus. Un devis si vous le souhaitez.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section nuit" id="objets">
+    <div class="wrap">
+      <p class="surtitre surtitre-clair">La marque chez vous</p>
+      <h2>Trois objets, trois endroits de la maison.</h2>
+      <div class="objets">
+        <article class="objet revele">
+          <svg viewBox="0 0 80 64" aria-hidden="true" class="objet-dessin">
+            <rect x="6" y="10" width="68" height="44" rx="4"/><rect x="12" y="16" width="56" height="32" rx="2"/>
+            <path d="M40 6 V10 M24 6 H56"/>
+          </svg>
+          <h3>Sur le portail, la pancarte</h3>
+          <p>Une plaque crème, « Maison veillée par Maison Flamingo ». Posée au premier passage, si vous le souhaitez. Dans la rue, elle dit : ici, la maison est tenue.</p>
+        </article>
+        <article class="objet revele">
+          <svg viewBox="0 0 80 64" aria-hidden="true" class="objet-dessin">
+            <path d="M10 18 L70 10 L72 50 L12 56 Z"/><path d="M20 26 H58 M20 34 H54 M20 42 H40"/>
+          </svg>
+          <h3>Sur la table, la carte</h3>
+          <p>Écrite et signée à la main à chaque passage : « Votre Flamingo est passé. Tout est en ordre. » C'est celle qu'on montre aux voisins.</p>
+        </article>
+        <article class="objet revele">
+          <svg viewBox="0 0 36 44" aria-hidden="true" class="objet-dessin objet-flamant"><use href="#flamant"/></svg>
+          <h3>Sur l'eau, le flamant</h3>
+          <p>Posé sur une eau claire à chaque remise en route de printemps. Les enfants l'adoptent, et l'été commence.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section fondateurs">
+    <div class="wrap fondateurs-grille">
+      <div class="revele">
+        <p class="surtitre">Les 25 fondateurs</p>
+        <h2>Vous nous faites confiance les premiers. On s'en souviendra.</h2>
+      </div>
+      <ul class="avantages revele">
+        <li><strong>Prix bloqué trois ans</strong><span>Quoi qu'il arrive aux produits ou au carburant.</span></li>
+        <li><strong>Premier mois offert</strong><span>Et sans engagement la première saison.</span></li>
+        <li><strong>Premiers servis</strong><span>Sur chaque nouveau service, avant tout le monde.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section creme" id="questions">
+    <div class="wrap etroit">
+      <p class="surtitre">Questions</p>
+      <h2>Celles qu'on nous pose.</h2>
+      <div class="faq">
+        <details>
+          <summary>Pourquoi chaque semaine, et pas tous les quinze jours ?</summary>
+          <p>Parce que le soleil du Gard détruit le chlore en quelques jours, et qu'une eau chaude peut tourner au vert en deux jours. Le passage hebdomadaire coûte plus par mois, mais moins par an : pas de traitement choc, pas de pompe qui force, pas de baignade annulée. En mars et en novembre, quand l'eau est froide, on passe tous les quinze jours.</p>
+        </details>
+        <details>
+          <summary>Pourquoi payer aussi l'hiver ?</summary>
+          <p>Vous ne payez pas l'hiver : le prix de l'année est réparti sur douze mois pour que votre budget reste le même. L'essentiel du travail tombe d'avril à octobre, et l'hivernage, la remise en route et le contrôle après le gel sont compris.</p>
+        </details>
+        <details>
+          <summary>J'ai déjà une alarme. À quoi sert la visite ?</summary>
+          <p>Gardez-la. Une caméra voit une silhouette. Elle ne voit pas la fuite sous l'évier, l'humidité dans la chambre du fond, le volet qui a cédé ni la piscine qui tourne. Nous venons voir ce qu'elle ne voit pas.</p>
+        </details>
+        <details>
+          <summary>Qui a mes clés ?</summary>
+          <p>Votre technicien, et lui seul. Chaque prise et chaque remise est enregistrée, et vous pouvez demander l'historique à tout moment. Pour la piscine seule, le code du portail suffit souvent.</p>
+        </details>
+        <details>
+          <summary>Et si quelque chose ne va pas ?</summary>
+          <p>On vous écrit, on vous envoie les photos, on propose une solution et un prix. Vous décidez. Nous n'avons rien d'autre à vous vendre que de la tranquillité.</p>
+        </details>
+        <details>
+          <summary>Où passez-vous ?</summary>
+          <p>Manduel, Bouillargues, Marguerittes, Caissargues, Rodilhan, Garons et Nîmes. Nous ouvrons petit, exprès, pour que les tournées restent courtes et que le temps passé chez vous ne soit jamais rogné. Ailleurs dans le Gard ? Inscrivez-vous quand même : c'est la liste d'attente qui décide de la commune suivante.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <section class="section liste" id="liste">
+    <div class="wrap liste-grille">
+      <div class="revele">
+        <p class="surtitre surtitre-clair">Liste d'attente · printemps 2027</p>
+        <h2>25 places. Pas une de plus la première saison.</h2>
+        <p class="intro intro-clair">Nous ouvrons petit, exprès. Laissez-nous vos coordonnées : nous vous écrivons en mars pour fixer votre diagnostic offert.</p>
+        <p class="petit-clair">Aucune carte bancaire. Aucun engagement. Un message, c'est tout.</p>
+      </div>
+
+      <form class="formulaire revele" id="formulaire" novalidate>
+        <div class="champs-2">
+          <label>Prénom<input name="prenom" type="text" autocomplete="given-name" required></label>
+          <label>Nom<input name="nom" type="text" autocomplete="family-name" required></label>
+        </div>
+        <div class="champs-2">
+          <label>Téléphone<input name="telephone" type="tel" autocomplete="tel" required></label>
+          <label>Courriel (facultatif)<input name="courriel" type="email" autocomplete="email"></label>
+        </div>
+        <label>Commune de la maison
+          <select name="commune" required>
+            <option value="">Choisir</option>
+            <option>Manduel</option><option>Bouillargues</option><option>Marguerittes</option>
+            <option>Caissargues</option><option>Rodilhan</option><option>Garons</option>
+            <option>Nîmes</option><option>Autre commune</option>
+          </select>
+        </label>
+        <fieldset>
+          <legend>Ce qui vous intéresse</legend>
+          <label class="case"><input type="checkbox" name="interet" value="Piscine"> Piscine</label>
+          <label class="case"><input type="checkbox" name="interet" value="Maison fermée"> Maison fermée</label>
+        </fieldset>
+        <!-- Champ piège : invisible pour une personne, rempli par les robots -->
+        <label class="piege" aria-hidden="true">Ne pas remplir<input name="site" type="text" tabindex="-1" autocomplete="off"></label>
+        <label class="case consentement"><input type="checkbox" name="consentement" required> J'accepte que Maison Flamingo conserve ces informations pour me recontacter au sujet de l'ouverture. Elles ne sont jamais revendues.</label>
+        <button type="submit" class="btn btn-turquoise">Réserver ma place fondateur</button>
+        <p class="form-message" id="form-message" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+  </section>
+</main>
+
+<footer class="pied">
+  <div class="bande-sunset" aria-hidden="true"></div>
+  <div class="wrap pied-grille">
+    <div class="logo logo-pied">
+      <svg class="logo-flamant" viewBox="0 0 36 44" aria-hidden="true"><use href="#flamant"/></svg>
+      <span class="logo-mots"><span class="logo-maison">Maison</span><span class="logo-flamingo">Flamingo</span></span>
+    </div>
+    <div class="pied-liens">
+      <a href="mailto:contact@maisonflamingo.fr">contact@maisonflamingo.fr</a>
+      <a href="tel:+33674859078">06 74 85 90 78</a>
+      <a href="https://www.instagram.com/maisonflamingo.fr/" rel="noopener">Instagram</a>
+      <a href="mentions-legales.html">Mentions légales</a>
+    </div>
+  </div>
+  <p class="pied-bas wrap">Manduel, Gard · © <span id="annee">2026</span> Maison Flamingo</p>
+</footer>
+
+<script src="site.js?v=3" defer></script>
+</body>
+</html>
