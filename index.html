@@ -13,20 +13,38 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@200;300;400;600;700&family=Jost:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
 
 <!-- Le symbole est déclaré une fois et réutilisé partout : un seul dessin à faire vectoriser -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <symbol id="flamant" viewBox="0 0 36 44">
-    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M14 42 V26" stroke="currentColor"/>
-      <path d="M14 26 C6 26 5 16 13 13 C19 11 22 15 22 19 C22 24 19 26 14 26 Z" stroke="currentColor"/>
-      <path d="M21 16 C21 9 26 4 31 5 C34 6 33 9 30 9 C27 9 26 12 26 15" stroke="currentColor"/>
-      <path d="M31 5 L34 7" stroke="currentColor"/>
-      <path d="M4 42 H24" stroke="var(--eau, #3FA69C)"/>
-    </g>
+  <symbol id="flamant" viewBox="0 0 600 804">
+    <defs>
+    <!-- Les creux du cou et de la tête, retirés d'un seul coup -->
+    <mask id="creux" maskUnits="userSpaceOnUse" x="0" y="0" width="600" height="804">
+      <rect width="600" height="804" fill="#fff"/>
+      <path d="M456 342 C456 300 440 262 420 236 C400 210 372 196 365 170 C360 152 360 134 364 118" fill="none" stroke="#000" stroke-width="26" stroke-linecap="round"/>
+      <ellipse cx="404" cy="102" rx="40" ry="20" fill="#000"/>
+    </mask>
+  </defs>
+  <g fill="currentColor" stroke="currentColor" mask="url(#creux)">
+    <path d="M456 342 C456 300 440 262 420 236 C400 210 372 196 365 170 C360 152 360 134 364 118" fill="none" stroke-width="62" stroke-linecap="round"/>
+    <ellipse cx="404" cy="102" rx="57" ry="37" stroke="none"/>
+  </g>
+  <g fill="none" stroke="currentColor" stroke-width="17" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M430 298 C400 270 350 236 300 250 C210 275 150 360 118 440 L360 440 C440 440 492 380 486 332"/>
+    <path d="M172 358 C214 312 262 302 302 306"/>
+    <path d="M304 338 C334 324 360 320 380 324"/>
+    <path d="M328 440 V656"/>
+    <path d="M304 440 L250 526 L388 608 L400 598"/>
+  </g>
+  <path d="M446 130 C474 142 490 170 484 202 C464 186 450 160 442 136 Z" fill="var(--eau, #3FA69C)"/>
+  <path d="M452 128 C478 144 492 172 484 202" fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round"/>
+  <circle cx="432" cy="106" r="5.5" fill="currentColor"/>
+  <g fill="none" stroke="var(--eau, #3FA69C)" stroke-width="16" stroke-linecap="round">
+    <path d="M104 660 H556"/><path d="M160 708 H500"/><path d="M216 754 H440"/>
+  </g>
   </symbol>
   <symbol id="palmier" viewBox="0 0 220 420">
     <g fill="currentColor">
@@ -50,7 +68,7 @@
   <div class="wrap nav-inner">
     <a href="#haut" class="logo" aria-label="Maison Flamingo, retour en haut">
       <svg class="logo-flamant" viewBox="0 0 36 44" aria-hidden="true"><use href="#flamant"/></svg>
-      <span class="logo-mots"><span class="logo-maison">Maison</span><span class="logo-flamingo">Flamingo</span></span>
+      <span class="logo-mots"><span class="logo-maison">Maison</span><span class="logo-flamingo" data-mot="Flamingo">Flamingo</span></span>
     </a>
     <nav class="nav-liens" aria-label="Navigation principale">
       <a href="#offres">Les offres</a>
@@ -349,7 +367,7 @@
   <div class="wrap pied-grille">
     <div class="logo logo-pied">
       <svg class="logo-flamant" viewBox="0 0 36 44" aria-hidden="true"><use href="#flamant"/></svg>
-      <span class="logo-mots"><span class="logo-maison">Maison</span><span class="logo-flamingo">Flamingo</span></span>
+      <span class="logo-mots"><span class="logo-maison">Maison</span><span class="logo-flamingo" data-mot="Flamingo">Flamingo</span></span>
     </div>
     <div class="pied-liens">
       <a href="mailto:contact@maisonflamingo.fr">contact@maisonflamingo.fr</a>
