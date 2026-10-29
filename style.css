@@ -99,7 +99,9 @@ section[id]{scroll-margin-top:84px}
 .hero-texte{display:flex;flex-direction:column;gap:26px;max-width:700px}
 /* La première ligne de la signature ne se coupe jamais : « plus » seul sur une ligne casse la phrase */
 .hero h1 .tenu{white-space:nowrap}
-.hero h1{font-size:clamp(40px,6vw,88px);line-height:.98;font-weight:200;text-shadow:0 2px 30px rgba(30,26,51,.35)}
+/* Sur téléphone seulement, la seconde ligne se coupe à l'endroit naturel : « on s'occupe / du reste » */
+.hero h1 .coupe{display:none}
+.hero h1{font-size:clamp(34px,4.4vw,63px);line-height:.98;font-weight:200;text-shadow:0 2px 30px rgba(30,26,51,.35)}
 .hero h1 strong{font-weight:600;display:inline-block;background:linear-gradient(90deg,#FCE3AE,#F6A57A 45%,#F28B9B);-webkit-background-clip:text;background-clip:text;color:transparent}
 .hero-sous{font-size:19.5px;line-height:1.6;color:rgba(247,242,234,.92);max-width:540px;text-shadow:0 1px 16px rgba(30,26,51,.5)}
 .hero-actions{display:flex;flex-wrap:wrap;gap:14px}
@@ -316,7 +318,8 @@ legend{font-size:14px;font-weight:500;margin-bottom:6px;padding:0}
   .palmier-g2{display:none}
   .palmier-d{height:38%;right:-60px}
   .hero .surtitre{display:none}
-  .hero h1{font-size:46px}
+  .hero h1{font-size:44px}
+  .hero h1 .coupe{display:inline}
   .hero-texte{gap:22px}
   .hero-sous{font-size:17.5px}
   .hero-actions .btn{width:100%}
