@@ -264,7 +264,15 @@ function a_espace_carnet(): void
         ];
     }
     sortir(200, ['ok' => true, 'client' => ['prenom' => $c['prenom'], 'commune' => $c['commune'], 'formule' => $c['formule'], 'statut' => $c['statut'], 'jour' => $c['statut'] === 'client' ? (JOURS[(int) $c['jour_passage']] ?? null) : null],
-        'historique' => $historique, 'equipe' => equipe_du_client($c), 'telephone' => TELEPHONE] + $carnet);
+        'historique' => $historique, 'equipe' => equipe_du_client($c), 'telephone' => TELEPHONE, 'demandes' => demandes_du_client((int) $c['id'])] + $carnet);
+}
+
+// Les messages du client et les réponses de l'équipe : écrire sans jamais lire la réponse ne sert à rien.
+function demandes_du_client(int $client): array
+{
+    $q = base()->prepare('SELECT texte, cree_le, traitee_le, reponse FROM demandes WHERE client_id = ? ORDER BY id DESC LIMIT 10');
+    $q->execute([$client]);
+    return $q->fetchAll();
 }
 
 function a_espace_creneau(): void

@@ -133,6 +133,7 @@ async function vueAccueilClient(bienvenue = false, onglet = 'sante') {
       <h2>Écrire à mon Flamingo</h2>
       <form id="f"><label>Votre message<textarea name="texte" rows="3" required placeholder="Une question, une absence, un souci sur la maison…"></textarea></label>
         <button>Envoyer</button><p class="message" id="m" role="status"></p></form>
+      ${d.demandes && d.demandes.length ? `<ul class="demandes">${d.demandes.map((x) => `<li>${echapper(x.texte)}<br><span class="quand">${echapper(dateFr(x.cree_le, false))} · ${x.traitee_le ? 'répondu' : 'en attente de réponse'}</span>${x.reponse ? `<p class="reponse">« ${echapper(x.reponse)} »</p>` : ''}</li>`).join('')}</ul>` : ''}
     </section>`;
 
   const parMois = {};
@@ -181,7 +182,7 @@ async function vueAccueilClient(bienvenue = false, onglet = 'sante') {
     ev.preventDefault();
     const m = document.getElementById('m');
     const r = await appel('espace_demande', { methode: 'POST', corps: { texte: ev.target.texte.value } });
-    if (r.ok) { m.textContent = 'Message envoyé. Nous revenons vers vous rapidement.'; ev.target.reset(); }
+    if (r.ok) { m.textContent = 'Message envoyé. Nous revenons vers vous rapidement.'; setTimeout(() => vueAccueilClient(false, 'sante'), 1200); }
     else m.textContent = r.erreur === 'trop' ? 'Plusieurs messages attendent déjà une réponse : appelez-nous si c\'est urgent.' : 'Écrivez quelques mots.';
   });
   zone().querySelectorAll('[data-creneau]').forEach((b) => b.addEventListener('click', async () => {
