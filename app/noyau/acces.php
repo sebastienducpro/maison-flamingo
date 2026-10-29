@@ -89,7 +89,7 @@ function session_equipe(): ?array
     if (!is_string($c) || strlen($c) < 20) {
         return null;
     }
-    $q = base()->prepare("SELECT u.id, u.nom, u.courriel, u.role, u.agence_id, u.totp_actif, u.totp_secret, u.totp_dernier,
+    $q = base()->prepare("SELECT u.id, u.nom, u.courriel, u.telephone, u.photo, u.role, u.agence_id, u.totp_actif, u.totp_secret, u.totp_dernier,
             s.totp_ok, s.jeton AS session, a.nom AS agence_nom
         FROM sessions s JOIN utilisateurs u ON u.id = s.utilisateur_id LEFT JOIN agences a ON a.id = u.agence_id
         WHERE s.jeton = ? AND s.expire > ? AND u.actif = 1 AND u.hash <> ''");
@@ -129,7 +129,7 @@ function public_utilisateur(array $u): array
     return [
         'id' => (int) $u['id'], 'nom' => $u['nom'], 'courriel' => $u['courriel'], 'role' => $u['role'],
         'agence_id' => $u['agence_id'] !== null ? (int) $u['agence_id'] : null, 'agence' => $u['agence_nom'] ?? null,
-        'double_facteur' => (int) $u['totp_actif'] === 1,
+        'double_facteur' => (int) $u['totp_actif'] === 1, 'telephone' => $u['telephone'] ?? '', 'photo' => ($u['photo'] ?? '') !== '',
     ];
 }
 

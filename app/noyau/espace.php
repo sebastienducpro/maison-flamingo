@@ -70,7 +70,7 @@ function a_espace_accueil(): void
             'jour' => JOURS[(int) $c['jour_passage']] ?? null, 'technicien' => $technicien !== '' ? explode(' ', $technicien)[0] : null],
         'visites' => array_map(fn ($x) => ['type' => $x['type'], 'quand' => $x['quand'], 'lien' => url_rapport($x['jeton']),
             'points' => $x['alertes'] !== null ? (int) $x['alertes'] : null], $v->fetchAll()),
-        'demandes' => $dm->fetchAll(), 'telephone' => TELEPHONE]);
+        'demandes' => $dm->fetchAll(), 'telephone' => TELEPHONE, 'equipe' => equipe_du_client($c)]);
 }
 
 function a_espace_demande(): void

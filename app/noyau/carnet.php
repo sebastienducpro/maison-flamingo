@@ -264,7 +264,7 @@ function a_espace_carnet(): void
         ];
     }
     sortir(200, ['ok' => true, 'client' => ['prenom' => $c['prenom'], 'commune' => $c['commune'], 'formule' => $c['formule'], 'statut' => $c['statut'], 'jour' => $c['statut'] === 'client' ? (JOURS[(int) $c['jour_passage']] ?? null) : null],
-        'historique' => $historique] + $carnet);
+        'historique' => $historique, 'equipe' => equipe_du_client($c), 'telephone' => TELEPHONE] + $carnet);
 }
 
 function a_espace_creneau(): void

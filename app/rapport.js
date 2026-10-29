@@ -87,5 +87,8 @@
       <p class="quand">${echapper(dateFr(r.quand))}${r.commune ? ' · ' + echapper(r.commune) : ''} · par ${echapper(r.auteur)}</p>
       <p class="verdict ${nb ? 'a-voir' : 'ok'}">${verdict}</p>
     </section>
-    ${sections}${blocConstats}${blocPhotos}${blocProposition}`;
+    ${sections}${blocConstats}${blocPhotos}${blocProposition}
+    ${r.equipe && r.equipe.length ? `<section class="bloc equipe-rapport"><h2>Qui est passé</h2><ul>${r.equipe.map((p) => `<li>
+      <div class="visage">${p.photo ? `<img src="${echapper(p.photo)}" alt="">` : `<span class="initiale">${echapper(p.prenom.charAt(0))}</span>`}</div>
+      <div><strong>${echapper(p.prenom)}</strong><span>${echapper(p.titre)}</span>${p.telephone ? `<a href="tel:${p.telephone.replace(/[^\d+]/g, '')}">${echapper(p.telephone)}</a>` : ''}</div></li>`).join('')}</ul></section>` : ''}`;
 })();

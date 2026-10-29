@@ -168,6 +168,126 @@ function a_motdepasse(): void
     sortir(200, ['ok' => true]);
 }
 
+function dossier_photos_equipe(): string
+{
+    $d = dossier_donnees() . '/photos-equipe';
+    if (!is_dir($d)) {
+        @mkdir($d, 0700, true);
+    }
+    return $d;
+}
+
+// La personne qui peut poser une photo : soi-même, ou un membre que l'on gère.
+function membre_pour_photo(array $u, int $id): ?array
+{
+    if ($id === 0 || $id === (int) $u['id']) {
+        $q = base()->prepare('SELECT * FROM utilisateurs WHERE id = ?');
+        $q->execute([$u['id']]);
+        return $q->fetch() ?: null;
+    }
+    return in_array($u['role'], ['chef', 'superadmin'], true) ? membre_gerable($u, $id) : null;
+}
+
+function a_compte_modifier(): void
+{
+    // Chacun tient son propre numéro : c'est celui que le client verra.
+    $u = exiger_equipe();
+    exiger_post();
+    $d = entree();
+    $telephone = texte($d['telephone'] ?? '', 30);
+    if ($telephone !== '' && !preg_match('/^[0-9+ .()\-]{6,30}$/', $telephone)) {
+        sortir(200, ['ok' => false, 'erreur' => 'telephone']);
+    }
+    base()->prepare('UPDATE utilisateurs SET telephone = ? WHERE id = ?')->execute([$telephone, $u['id']]);
+    tracer($u, 'coordonnées modifiées', 'téléphone');
+    sortir(200, ['ok' => true]);
+}
+
+function a_photo_equipe_poser(): void
+{
+    $u = exiger_equipe();
+    exiger_post();
+    $m = membre_pour_photo($u, entier($_POST['id'] ?? 0));
+    if (!$m) {
+        tracer($u, 'photo refusée', (string) ($_POST['id'] ?? ''));
+        sortir(404, ['ok' => false, 'erreur' => 'introuvable']);
+    }
+    $f = $_FILES['photo'] ?? null;
+    $info = $f && is_uploaded_file((string) $f['tmp_name']) && (int) $f['size'] <= 2000000 ? @getimagesize((string) $f['tmp_name']) : false;
+    if (!$info || !in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG], true)) {
+        sortir(200, ['ok' => false, 'erreur' => 'photo']);
+    }
+    // Un nom tiré au hasard à chaque dépôt : l'ancienne photo ne reste pas en cache chez le client.
+    $nom = $m['id'] . '-' . jeton(8) . ($info[2] === IMAGETYPE_PNG ? '.png' : '.jpg');
+    if (!move_uploaded_file((string) $f['tmp_name'], dossier_photos_equipe() . '/' . $nom)) {
+        sortir(500, ['ok' => false, 'erreur' => 'ecriture']);
+    }
+    if ($m['photo'] !== '') {
+        @unlink(dossier_photos_equipe() . '/' . basename($m['photo']));
+    }
+    base()->prepare('UPDATE utilisateurs SET photo = ? WHERE id = ?')->execute([$nom, $m['id']]);
+    tracer($u, 'photo posée', (string) $m['id']);
+    sortir(200, ['ok' => true]);
+}
+
+// La photo d'un membre se voit par l'équipe, par ses clients, et par qui tient un lien de rapport qu'il a signé.
+// Jamais par une adresse nue : les visages de l'équipe ne se parcourent pas.
+function a_photo_equipe(): void
+{
+    $q = base()->prepare("SELECT id, photo, agence_id, role FROM utilisateurs WHERE id = ? AND photo <> ''");
+    $q->execute([entier($_GET['id'] ?? 0)]);
+    $m = $q->fetch();
+    $permis = false;
+    if ($m) {
+        $t = (string) ($_GET['t'] ?? '');
+        if ($t !== '' && preg_match('/^[A-Za-z0-9_-]{24,64}$/', $t)) {
+            $v = base()->prepare('SELECT v.technicien_id, c.technicien_id AS actuel, c.agence_id FROM visites v JOIN clients c ON c.id = v.client_id WHERE v.jeton = ?');
+            $v->execute([$t]);
+            $x = $v->fetch();
+            $permis = $x && ((int) $x['technicien_id'] === (int) $m['id'] || (int) $x['actuel'] === (int) $m['id'] || ($m['role'] === 'chef' && (int) $x['agence_id'] === (int) $m['agence_id']));
+        }
+        if (!$permis) {
+            $cl = session_client();
+            $permis = $cl && ((int) $cl['technicien_id'] === (int) $m['id'] || (in_array($m['role'], ['chef', 'superadmin'], true) && ($m['role'] === 'superadmin' || (int) $cl['agence_id'] === (int) $m['agence_id'])));
+        }
+        if (!$permis) {
+            $u = session_equipe();
+            $permis = $u && (!double_facteur_requis($u) || (int) $u['totp_ok'] === 1);
+        }
+    }
+    $chemin = $m ? dossier_photos_equipe() . '/' . basename($m['photo']) : '';
+    if (!$permis || !is_file($chemin)) {
+        sortir(404, ['ok' => false]);
+    }
+    header('Content-Type: ' . (str_ends_with($chemin, '.png') ? 'image/png' : 'image/jpeg'));
+    header('Cache-Control: private, max-age=86400');
+    readfile($chemin);
+    exit;
+}
+
+// L'équipe d'un client, telle qu'il la verra : son technicien et le chef de son agence, avec visage et numéro.
+function equipe_du_client(array $c, ?string $jeton = null): array
+{
+    $db = base();
+    $suffixe = $jeton ? '&t=' . $jeton : '';
+    $forme = fn ($m, $titre) => ['id' => (int) $m['id'], 'prenom' => explode(' ', (string) $m['nom'])[0], 'nom' => $m['nom'], 'titre' => $titre, 'telephone' => $m['telephone'],
+        'photo' => $m['photo'] !== '' ? 'api.php?action=photo_equipe&id=' . $m['id'] . $suffixe : null];
+    $sortie = [];
+    if ($c['technicien_id']) {
+        $t = $db->prepare("SELECT id, nom, telephone, photo FROM utilisateurs WHERE id = ? AND actif = 1 AND role = 'technicien'");
+        $t->execute([$c['technicien_id']]);
+        if ($m = $t->fetch()) {
+            $sortie[] = $forme($m, 'Votre Flamingo');
+        }
+    }
+    $ch = $db->prepare("SELECT id, nom, telephone, photo FROM utilisateurs WHERE actif = 1 AND hash <> '' AND role = 'chef' AND agence_id = ? ORDER BY id LIMIT 1");
+    $ch->execute([$c['agence_id']]);
+    if ($m = $ch->fetch()) {
+        $sortie[] = $forme($m, 'Responsable d\'agence');
+    }
+    return $sortie;
+}
+
 /* ---------- Invitations (publiques, protégées par leur jeton) ---------- */
 
 function a_invitation_lire(): void
@@ -610,7 +730,7 @@ function a_rapport(): void
     if (!preg_match('/^[A-Za-z0-9_-]{24,64}$/', $t)) {
         sortir(404, ['ok' => false]);
     }
-    $q = base()->prepare('SELECT v.id, v.type, v.quand, v.auteur, v.donnees, c.prenom, c.commune FROM visites v JOIN clients c ON c.id = v.client_id WHERE v.jeton = ?');
+    $q = base()->prepare('SELECT v.id, v.type, v.quand, v.auteur, v.donnees, v.technicien_id, c.prenom, c.commune, c.agence_id, c.technicien_id AS technicien_actuel FROM visites v JOIN clients c ON c.id = v.client_id WHERE v.jeton = ?');
     $q->execute([$t]);
     $v = $q->fetch();
     if (!$v) {
@@ -621,7 +741,8 @@ function a_rapport(): void
     $p = base()->prepare('SELECT id, legende FROM photos WHERE visite_id = ? ORDER BY id');
     $p->execute([$v['id']]);
     $photos = array_map(fn ($x) => ['url' => 'api.php?action=photo&id=' . $x['id'] . '&t=' . $t, 'legende' => $x['legende']], $p->fetchAll());
-    sortir(200, ['ok' => true, 'rapport' => ['type' => $v['type'], 'quand' => $v['quand'], 'auteur' => $v['auteur'], 'prenom' => $v['prenom'], 'commune' => $v['commune'], 'contenu' => $contenu, 'photos' => $photos]]);
+    $equipe = equipe_du_client(['technicien_id' => $v['technicien_id'] ?: $v['technicien_actuel'], 'agence_id' => $v['agence_id']], $t);
+    sortir(200, ['ok' => true, 'rapport' => ['type' => $v['type'], 'quand' => $v['quand'], 'auteur' => $v['auteur'], 'prenom' => $v['prenom'], 'commune' => $v['commune'], 'contenu' => $contenu, 'photos' => $photos, 'equipe' => $equipe]]);
 }
 
 function a_photo(): void
@@ -789,7 +910,7 @@ function a_geocoder_manquants(): void
 function a_equipe(): void
 {
     $u = exiger_equipe(['chef', 'superadmin']);
-    $sql = "SELECT u.id, u.nom, u.courriel, u.telephone, u.role, u.agence_id, u.actif, u.totp_actif, u.derniere_connexion, u.hash = '' AS en_attente, a.nom AS agence,
+    $sql = "SELECT u.id, u.nom, u.courriel, u.telephone, u.photo, u.role, u.agence_id, u.actif, u.totp_actif, u.derniere_connexion, u.hash = '' AS en_attente, a.nom AS agence,
             (SELECT COUNT(*) FROM clients c WHERE c.technicien_id = u.id AND c.statut IN ('client', 'prospect', 'veille')) AS clients,
             (SELECT COUNT(*) FROM secteurs s WHERE s.technicien_id = u.id) AS secteurs
         FROM utilisateurs u LEFT JOIN agences a ON a.id = u.agence_id";
@@ -801,7 +922,7 @@ function a_equipe(): void
     }
     $agences = $u['role'] === 'superadmin' ? base()->query('SELECT id, nom FROM agences WHERE actif = 1 ORDER BY nom')->fetchAll() : [];
     sortir(200, ['ok' => true, 'membres' => array_map(fn ($m) => [
-        'id' => (int) $m['id'], 'nom' => $m['nom'], 'courriel' => $m['courriel'], 'telephone' => $m['telephone'], 'role' => $m['role'], 'agence' => $m['agence'],
+        'id' => (int) $m['id'], 'nom' => $m['nom'], 'courriel' => $m['courriel'], 'telephone' => $m['telephone'], 'photo' => $m['photo'] !== '', 'role' => $m['role'], 'agence' => $m['agence'],
         'clients' => (int) $m['clients'], 'secteurs' => (int) $m['secteurs'],
         'agence_id' => $m['agence_id'] !== null ? (int) $m['agence_id'] : null, 'actif' => (int) $m['actif'] === 1,
         'double_facteur' => (int) $m['totp_actif'] === 1, 'derniere_connexion' => $m['derniere_connexion'], 'en_attente' => (int) $m['en_attente'] === 1,

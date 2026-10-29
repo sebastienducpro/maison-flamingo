@@ -124,6 +124,11 @@ async function vueAccueilClient(bienvenue = false, onglet = 'sante') {
     ${d.postes.length ? `<h2 class="intertitre">Poste par poste</h2>
     <ul class="postes-client">${d.postes.map((p) => `<li><div><strong>${echapper(p.libelle)}</strong>${p.detail ? `<span>${echapper(p.detail)}</span>` : ''}</div><span class="pastille-etat ${p.etat}">${MOTS_ETAT[p.etat]}</span></li>`).join('')}</ul>` : ''}
     ${d.client.jour ? `<div class="prochain"><span class="surtitre">Votre Flamingo passe chaque</span><div class="grand-jour">${echapper(d.client.jour.toLowerCase())}</div></div>` : ''}
+    ${d.equipe && d.equipe.length ? `<h2 class="intertitre">Votre équipe</h2><ul class="equipe-client">${d.equipe.map((p) => `<li>
+      <div class="visage">${p.photo ? `<img src="${echapper(p.photo)}" alt="">` : `<span class="initiale">${echapper(p.prenom.charAt(0))}</span>`}</div>
+      <div><strong>${echapper(p.prenom)}</strong><span>${echapper(p.titre)}</span>${p.telephone ? `<a href="tel:${p.telephone.replace(/[^\d+]/g, '')}">${echapper(p.telephone)}</a>` : ''}</div>
+      ${p.telephone ? `<a class="petit-bouton" href="tel:${p.telephone.replace(/[^\d+]/g, '')}">Appeler</a>` : ''}
+    </li>`).join('')}</ul>` : ''}
     <section class="carte-espace">
       <h2>Écrire à mon Flamingo</h2>
       <form id="f"><label>Votre message<textarea name="texte" rows="3" required placeholder="Une question, une absence, un souci sur la maison…"></textarea></label>

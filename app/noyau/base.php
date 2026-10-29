@@ -11,7 +11,7 @@ date_default_timezone_set('Europe/Paris');
 // Un avertissement glissé dans une réponse casse le JSON et peut montrer un chemin du serveur.
 ini_set('display_errors', '0');
 
-const VERSION_SCHEMA = 5;
+const VERSION_SCHEMA = 6;
 const TAILLE_PHOTO_MAX = 4000000;
 const PHOTOS_MAX = 6;
 const EXPEDITEUR = 'contact@maisonflamingo.fr';
@@ -185,6 +185,8 @@ function migrer(PDO $db): void
     ajouter_colonne($db, 'utilisateurs', 'totp_actif', 'INTEGER NOT NULL DEFAULT 0');
     ajouter_colonne($db, 'utilisateurs', 'totp_dernier', 'INTEGER NOT NULL DEFAULT 0');
     ajouter_colonne($db, 'utilisateurs', 'derniere_connexion', 'TEXT');
+    // Version 6 : le visage et le numéro du technicien, que le client voit. C'est rassurant, et c'est la marque.
+    ajouter_colonne($db, 'utilisateurs', 'photo', "TEXT NOT NULL DEFAULT ''");
     ajouter_colonne($db, 'sessions', 'totp_ok', 'INTEGER NOT NULL DEFAULT 0');
     ajouter_colonne($db, 'sessions', 'cree_le', "TEXT NOT NULL DEFAULT ''");
     ajouter_colonne($db, 'clients', 'agence_id', 'INTEGER');

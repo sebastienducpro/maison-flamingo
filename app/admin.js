@@ -90,10 +90,19 @@ async function vueCompte() {
   const u = APP.utilisateur, roles = { technicien: 'Technicien', chef: 'Chef d\'agence', superadmin: 'Direction' };
   vue().innerHTML = `
     <h1>Mon compte</h1>
-    <section class="carte">
-      <p><strong>${echapper(u.nom)}</strong> · ${roles[u.role] || ''}${u.agence ? ' · agence ' + echapper(u.agence) : ''}</p>
+    <section class="carte profil">
+      <div class="visage">${u.photo ? `<img src="api.php?action=photo_equipe&id=${u.id}&v=${Date.now()}" alt="">` : '<span class="initiale">' + echapper(u.nom.charAt(0)) + '</span>'}</div>
+      <div><p><strong>${echapper(u.nom)}</strong> · ${roles[u.role] || ''}${u.agence ? ' · agence ' + echapper(u.agence) : ''}</p>
       <p class="aide">${echapper(u.courriel)} · second facteur ${u.double_facteur ? 'activé' : 'non activé'}</p>
+      <p class="aide">Votre photo et votre numéro sont montrés aux clients dont vous vous occupez, dans leur espace et sur chaque rapport. Un visage connu, c'est quelqu'un qu'on laisse entrer.</p>
+      <label class="bouton secondaire fichier">${u.photo ? 'Changer ma photo' : 'Ajouter ma photo'}<input id="ma-photo" type="file" accept="image/*" capture="user" hidden></label>
+      <p class="message" id="m-photo" role="status"></p></div>
     </section>
+    <form id="f-tel" class="carte">
+      <label>Mon téléphone, vu par les clients<input name="telephone" type="tel" value="${echapper(u.telephone || '')}" placeholder="06 00 00 00 00"></label>
+      <button class="secondaire">Enregistrer</button>
+      <p class="message" id="m-tel" role="status"></p>
+    </form>
     <form id="f" class="carte">
       <h2>Changer de mot de passe</h2>
       <p class="aide">Toutes vos autres sessions seront fermées : c'est le bon geste si vous pensez qu'on a pu utiliser votre compte.</p>
@@ -103,6 +112,23 @@ async function vueCompte() {
       <p class="message" id="m" role="status"></p>
     </form>
     <button class="secondaire" id="sortir">Se déconnecter</button>`;
+  document.getElementById('ma-photo').addEventListener('change', async (ev) => {
+    const m = document.getElementById('m-photo'), f = ev.target.files[0];
+    if (!f) return;
+    m.textContent = 'Envoi…';
+    try {
+      const blob = await compresser(f, 600);
+      const fd = new FormData(); fd.append('id', '0'); fd.append('photo', blob, 'photo.jpg');
+      const r = await api('photo_equipe_poser', { methode: 'POST', formulaire: fd });
+      if (r.ok) { APP.utilisateur.photo = true; garderQui(APP.utilisateur); vueCompte(); } else m.textContent = 'La photo n\'est pas passée (JPEG ou PNG, 2 Mo au plus).';
+    } catch (e) { m.textContent = 'Cette image n\'a pas pu être lue.'; }
+  });
+  document.getElementById('f-tel').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const r = await api('compte_modifier', { methode: 'POST', corps: { telephone: ev.target.telephone.value } });
+    document.getElementById('m-tel').textContent = r.ok ? 'Numéro enregistré.' : 'Ce numéro n\'a pas l\'air valable.';
+    if (r.ok) { APP.utilisateur.telephone = ev.target.telephone.value; garderQui(APP.utilisateur); }
+  });
   document.getElementById('f').addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const f = ev.target, m = document.getElementById('m');
@@ -189,6 +215,7 @@ async function vueEquipe() {
   vue().innerHTML = `
     <h1>Équipe</h1>
     <ul class="liste">${d.membres.map((m) => `<li class="membre${m.actif ? '' : ' inactif'}">
+      <div class="visage petit">${m.photo ? `<img src="api.php?action=photo_equipe&id=${m.id}" alt="">` : '<span class="initiale">' + echapper(m.nom.charAt(0)) + '</span>'}</div>
       <div><span class="nom">${echapper(m.nom)}</span> <span class="sous">${roles[m.role]}${m.agence ? ' · ' + echapper(m.agence) : ''}${m.role === 'technicien' ? ' · ' + m.clients + ' client' + (m.clients > 1 ? 's' : '') + (m.secteurs ? ' · ' + m.secteurs + ' secteur' + (m.secteurs > 1 ? 's' : '') : '') : ''}</span></div>
       <span class="sous">${echapper(m.courriel)}${m.telephone ? ' · ' + echapper(m.telephone) : ''} · ${!m.actif ? 'désactivé' : m.en_attente ? 'invitation en attente' : m.derniere_connexion ? 'vu le ' + echapper(dateFr(m.derniere_connexion, false)) : 'jamais connecté'}${m.double_facteur ? ' · second facteur' : ''}</span>
       ${m.id !== APP.utilisateur.id && m.role !== 'superadmin' && (sa || m.role === 'technicien') ? `<div class="actions-ligne">
@@ -201,6 +228,7 @@ async function vueEquipe() {
       <form class="carte sous-forme" data-forme-modifier="${m.id}" hidden>
         <div class="deux"><label>Prénom et nom<input name="nom" value="${echapper(m.nom)}" required></label><label>Téléphone<input name="telephone" type="tel" value="${echapper(m.telephone || '')}"></label></div>
         <label>Courriel de connexion <span class="aide">le changer change son identifiant ; prévenez-le</span><input name="courriel" type="email" value="${echapper(m.courriel)}" required></label>
+        <label class="bouton secondaire fichier">${m.photo ? 'Changer sa photo' : 'Poser sa photo'}<input type="file" accept="image/*" data-photo-membre="${m.id}" hidden></label>
         <button class="secondaire">Enregistrer</button>
       </form>
       <form class="carte sous-forme" data-forme-remplacer="${m.id}" hidden>
@@ -245,6 +273,16 @@ async function vueEquipe() {
     const id = b.dataset.modifier || b.dataset.remplacer;
     const f = vue().querySelector(`[data-forme-${b.dataset.modifier ? 'modifier' : 'remplacer'}="${id}"]`);
     f.hidden = !f.hidden;
+  }));
+  vue().querySelectorAll('[data-photo-membre]').forEach((i) => i.addEventListener('change', async () => {
+    const f = i.files[0];
+    if (!f) return;
+    try {
+      const blob = await compresser(f, 600);
+      const fd = new FormData(); fd.append('id', i.dataset.photoMembre); fd.append('photo', blob, 'photo.jpg');
+      const r = await api('photo_equipe_poser', { methode: 'POST', formulaire: fd });
+      if (r.ok) vueEquipe(); else m.textContent = 'La photo n\'est pas passée.';
+    } catch (e) { m.textContent = 'Cette image n\'a pas pu être lue.'; }
   }));
   vue().querySelectorAll('[data-forme-modifier]').forEach((f) => f.addEventListener('submit', async (ev) => {
     ev.preventDefault();

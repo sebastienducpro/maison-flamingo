@@ -512,13 +512,13 @@ async function vueClient(id) {
 
 /* ---------- Le formulaire de visite ---------- */
 
-async function compresser(fichier) {
+async function compresser(fichier, max = 1600) {
   let source = null;
   try { source = await createImageBitmap(fichier, { imageOrientation: 'from-image' }); } catch (e) { source = null; }
   if (!source) {
     source = await new Promise((ok, ko) => { const i = new Image(); i.onload = () => ok(i); i.onerror = ko; i.src = URL.createObjectURL(fichier); });
   }
-  const max = 1600, k = Math.min(1, max / Math.max(source.width, source.height));
+  const k = Math.min(1, max / Math.max(source.width, source.height));
   const c = document.createElement('canvas');
   c.width = Math.round(source.width * k); c.height = Math.round(source.height * k);
   c.getContext('2d').drawImage(source, 0, 0, c.width, c.height);

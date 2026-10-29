@@ -27,7 +27,7 @@ const ACTIONS = [
     'clients', 'client', 'client_enregistrer', 'client_supprimer', 'import_liste',
     'visite_enregistrer', 'visite_courriel', 'visite_marquer_envoyee', 'rapport', 'photo',
     'tournee', 'tournee_ordonner', 'charge', 'longues', 'geocoder_manquants',
-    'equipe', 'equipe_inviter', 'equipe_modifier', 'equipe_lien', 'equipe_remplacer', 'agences', 'agence_enregistrer',
+    'equipe', 'equipe_inviter', 'equipe_modifier', 'equipe_lien', 'equipe_remplacer', 'compte_modifier', 'photo_equipe_poser', 'photo_equipe', 'agences', 'agence_enregistrer',
     'tableau', 'export', 'demandes', 'demande_traiter', 'client_inviter', 'client_compte_couper', 'journal',
     'sauvegardes', 'sauvegarde_lancer', 'sauvegarde_telecharger',
     'espace_etat', 'espace_connexion', 'espace_deconnexion', 'espace_accueil', 'espace_demande', 'espace_motdepasse',
@@ -43,7 +43,7 @@ try {
         sortir(404, ['ok' => false, 'erreur' => 'action']);
     }
     // Filet de sauvegarde : si la copie quotidienne manque, l'équipe la déclenche sans le savoir.
-    if (!in_array($action, ['rapport', 'photo', 'etat', 'document', 'a_faire'], true) && !str_starts_with($action, 'espace_') && session_equipe()) {
+    if (!in_array($action, ['rapport', 'photo', 'etat', 'document', 'a_faire', 'photo_equipe'], true) && !str_starts_with($action, 'espace_') && session_equipe()) {
         sauvegarde_si_due();
     }
     ('a_' . $action)();
