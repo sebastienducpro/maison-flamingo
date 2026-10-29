@@ -9,43 +9,17 @@
 <meta property="og:title" content="Maison Flamingo · Votre maison, vue chaque semaine">
 <meta property="og:description" content="Piscine et maison veillées chaque semaine autour de Nîmes. 25 places fondateurs pour le printemps 2027.">
 <meta property="og:locale" content="fr_FR">
-<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.png?v=1" type="image/png">
+<link rel="apple-touch-icon" href="favicon.png?v=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@200;300;400;600;700&family=Jost:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=9">
+<link rel="stylesheet" href="style.css?v=10">
 </head>
 <body>
 
 <!-- Le symbole est déclaré une fois et réutilisé partout : un seul dessin à faire vectoriser -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <symbol id="flamant" viewBox="0 0 600 804">
-    <defs>
-    <!-- Les creux du cou et de la tête, retirés d'un seul coup -->
-    <mask id="creux" maskUnits="userSpaceOnUse" x="0" y="0" width="600" height="804">
-      <rect width="600" height="804" fill="#fff"/>
-      <path d="M456 342 C456 300 440 262 420 236 C400 210 372 196 365 170 C360 152 360 134 364 118" fill="none" stroke="#000" stroke-width="26" stroke-linecap="round"/>
-      <ellipse cx="404" cy="102" rx="40" ry="20" fill="#000"/>
-    </mask>
-  </defs>
-  <g fill="currentColor" stroke="currentColor" mask="url(#creux)">
-    <path d="M456 342 C456 300 440 262 420 236 C400 210 372 196 365 170 C360 152 360 134 364 118" fill="none" stroke-width="62" stroke-linecap="round"/>
-    <ellipse cx="404" cy="102" rx="57" ry="37" stroke="none"/>
-  </g>
-  <g fill="none" stroke="currentColor" stroke-width="17" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M430 298 C400 270 350 236 300 250 C210 275 150 360 118 440 L360 440 C440 440 492 380 486 332"/>
-    <path d="M172 358 C214 312 262 302 302 306"/>
-    <path d="M304 338 C334 324 360 320 380 324"/>
-    <path d="M328 440 V656"/>
-    <path d="M304 440 L250 526 L388 608 L400 598"/>
-  </g>
-  <path d="M446 130 C474 142 490 170 484 202 C464 186 450 160 442 136 Z" fill="var(--eau, #3FA69C)"/>
-  <path d="M452 128 C478 144 492 172 484 202" fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round"/>
-  <circle cx="432" cy="106" r="5.5" fill="currentColor"/>
-  <g fill="none" stroke="var(--eau, #3FA69C)" stroke-width="16" stroke-linecap="round">
-    <path d="M104 660 H556"/><path d="M160 708 H500"/><path d="M216 754 H440"/>
-  </g>
-  </symbol>
   <symbol id="palmier" viewBox="0 0 220 420">
     <g fill="currentColor">
       <path d="M84 420 C86 330 92 240 104 170 C110 134 115 114 118 100 L125 102 C122 118 118 138 114 172 C104 242 100 330 102 420 Z"/>
@@ -67,7 +41,7 @@
 <header class="nav" id="nav">
   <div class="wrap nav-inner">
     <a href="#haut" class="logo" aria-label="Maison Flamingo, retour en haut">
-      <svg class="logo-flamant" viewBox="0 0 36 44" aria-hidden="true"><use href="#flamant"/></svg>
+      <img class="logo-flamant" src="flamant.png?v=1" alt="" width="30" height="45">
       <span class="logo-mots"><span class="logo-maison">Maison</span><span class="logo-flamingo" data-mot="Flamingo">Flamingo</span></span>
     </a>
     <nav class="nav-liens" aria-label="Navigation principale">
@@ -107,7 +81,7 @@
 
       <figure class="carte-passage" aria-label="Exemple de carte laissée après un passage">
         <div class="carte-entete">
-          <svg viewBox="0 0 36 44" aria-hidden="true"><use href="#flamant"/></svg>
+          <img src="flamant.png?v=1" alt="" width="20" height="30">
           <span>Maison Flamingo</span>
         </div>
         <p class="carte-ligne">Votre Flamingo est passé jeudi 12 juin, à 10 h 40.</p>
@@ -266,7 +240,7 @@
           <p>Écrite et signée à la main à chaque passage : « Votre Flamingo est passé. Tout est en ordre. » C'est celle qu'on montre aux voisins.</p>
         </article>
         <article class="objet revele">
-          <svg viewBox="0 0 36 44" aria-hidden="true" class="objet-dessin objet-flamant"><use href="#flamant"/></svg>
+          <img class="objet-dessin objet-flamant" src="flamant.png?v=1" alt="">
           <h3>Sur l'eau, le flamant</h3>
           <p>Posé sur une eau claire à chaque remise en route de printemps. Les enfants l'adoptent, et l'été commence.</p>
         </article>
@@ -366,7 +340,7 @@
   <div class="bande-sunset" aria-hidden="true"></div>
   <div class="wrap pied-grille">
     <div class="logo logo-pied">
-      <svg class="logo-flamant" viewBox="0 0 36 44" aria-hidden="true"><use href="#flamant"/></svg>
+      <img class="logo-flamant" src="flamant.png?v=1" alt="" width="30" height="45">
       <span class="logo-mots"><span class="logo-maison">Maison</span><span class="logo-flamingo" data-mot="Flamingo">Flamingo</span></span>
     </div>
     <div class="pied-liens">

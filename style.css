@@ -46,7 +46,7 @@ section[id]{scroll-margin-top:84px}
 .nav.colle{background:rgba(247,242,234,.93);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 1px 0 rgba(30,42,46,.08)}
 .logo{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--creme)}
 .nav.colle .logo{color:var(--encre)}
-.logo-flamant{width:30px;height:40px;color:var(--rose)}
+.logo-flamant{width:30px;height:45px;object-fit:contain}
 .logo-mots{display:flex;flex-direction:column;line-height:1}
 .logo-maison{font-family:var(--titre);font-size:10.5px;letter-spacing:.42em;text-transform:uppercase;color:var(--lagon)}
 .nav.colle .logo-maison{color:var(--turquoise)}
@@ -113,7 +113,7 @@ section[id]{scroll-margin-top:84px}
 .carte-passage::before{content:"";position:absolute;inset:8px;border:1px solid var(--sable);border-radius:12px;pointer-events:none}
 @keyframes poser{from{opacity:0;transform:translateY(30px) rotate(2deg)}to{opacity:1;transform:rotate(-2.5deg)}}
 .carte-entete{display:flex;align-items:center;gap:10px;margin-bottom:16px}
-.carte-entete svg{width:20px;height:27px;color:var(--rose)}
+.carte-entete img{width:20px;height:30px;object-fit:contain}
 .carte-entete span{font-family:var(--titre);font-size:12px;letter-spacing:.3em;text-transform:uppercase;color:var(--turquoise)}
 .carte-ligne{font-size:21px;line-height:1.35;font-style:italic}
 .carte-ok{font-weight:600;margin:4px 0 16px}
@@ -202,7 +202,7 @@ section[id]{scroll-margin-top:84px}
 .objets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px;margin-top:52px}
 .objet{border:1px solid rgba(249,210,157,.28);outline:1px solid rgba(249,210,157,.28);outline-offset:-9px;padding:40px 32px 34px;display:flex;flex-direction:column;gap:14px}
 .objet-dessin{width:76px;height:60px;fill:none;stroke:var(--rose);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;margin-bottom:8px;color:var(--rose)}
-.objet-flamant{width:48px;height:64px;stroke:none;--eau:var(--lagon)}
+.objet-flamant{width:44px;height:66px;object-fit:contain}
 .objet h3{font-size:21px;font-weight:600;color:var(--or)}
 .objet p{color:rgba(247,242,234,.82);font-size:16px}
 
