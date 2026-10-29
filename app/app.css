@@ -1,0 +1,95 @@
+/* Maison Flamingo · outil terrain. Lisible en plein soleil, d'une main, avec des doigts mouillés. */
+:root{
+  --rose:#F28B9B; --rose-fonce:#D9667E; --sunset:#F6A57A; --turquoise:#1F7A73; --eau:#3FA69C; --lagon:#8FD3CB;
+  --creme:#F7F2EA; --creme-2:#FBF7F0; --sable:#E6D9C6; --encre:#1E2A2E; --encre-2:#3A474C; --gris:#5A676C;
+  --nuit:#1E1A33; --violet:#2A1D3D;
+  --vert:#2E8B57; --orange:#D9822B; --rouge:#C0392B;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--creme);color:var(--encre);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:17px;line-height:1.5;padding-bottom:env(safe-area-inset-bottom)}
+h1{font-size:26px;line-height:1.2;margin:8px 0 14px;font-weight:600}
+h2{font-size:19px;margin:28px 0 10px;font-weight:600}
+a{color:var(--turquoise)}
+code{background:var(--creme-2);padding:1px 5px;border-radius:4px;font-size:.9em}
+
+.barre{position:sticky;top:0;z-index:20;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top));background:var(--violet);color:var(--creme)}
+.marque{display:flex;align-items:center;gap:10px;white-space:nowrap;min-width:0;color:var(--creme);text-decoration:none;font-size:15px;letter-spacing:.12em;text-transform:uppercase}
+.marque img{height:30px;width:auto}
+.etat{display:flex;align-items:center;gap:10px;font-size:14px;color:#D8D2E4}
+.attente{background:var(--sunset);color:var(--nuit);border-radius:999px;padding:2px 10px;font-weight:600;font-size:13px;white-space:nowrap}
+#qui{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px}
+.hors-ligne{background:#FBE7D6;color:#7A3B12;border-radius:12px;padding:10px 14px;font-size:14px;margin:0 0 14px}
+
+#vue{max-width:760px;margin:0 auto;padding:16px 16px 120px}
+.chargement,.vide{color:var(--gris)}
+.carte{background:#fff;border:1px solid var(--sable);border-radius:16px;padding:20px}
+.carte.etroite{max-width:440px;margin:40px auto}
+.tete{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.sous{color:var(--gris);font-size:14px;margin:0}
+.retour{display:inline-block;margin:4px 0 6px;text-decoration:none;font-size:15px}
+.aide{display:block;color:var(--gris);font-size:13.5px;font-weight:400}
+h1 .aide,h2 .aide{display:inline;margin-left:8px;font-size:13px}
+.unite{color:var(--gris);font-weight:400;font-size:14px}
+.message{min-height:1.4em;color:var(--turquoise);font-weight:500}
+
+label{display:flex;flex-direction:column;gap:6px;font-weight:500;font-size:15px;margin-bottom:14px}
+input,select,textarea{font:inherit;font-size:17px;color:var(--encre);background:#fff;border:1.5px solid var(--sable);border-radius:12px;padding:12px 14px;min-height:50px;width:100%}
+textarea{min-height:auto;resize:vertical}
+input:focus,select:focus,textarea:focus{outline:3px solid var(--lagon);border-color:var(--eau)}
+.deux{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:520px){.deux{grid-template-columns:1fr;gap:0}}
+
+button,.bouton{font:inherit;font-size:16px;font-weight:600;border:0;border-radius:999px;min-height:52px;padding:0 22px;display:inline-flex;align-items:center;justify-content:center;text-align:center;text-decoration:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.principal{background:var(--turquoise);color:#fff}
+.principal.clair{background:var(--rose);color:var(--nuit)}
+.secondaire{background:#fff;color:var(--turquoise);border:1.5px solid var(--turquoise)}
+.discret{background:transparent;color:var(--gris);min-height:40px;padding:0 10px;font-weight:500}
+button:disabled{opacity:.5}
+.gros-boutons{display:grid;gap:10px;margin:14px 0}
+.actions-ligne{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.actions-ligne .bouton,.actions-ligne button{min-height:44px;font-size:15px;padding:0 16px}
+
+.recherche{margin:4px 0 8px}
+.liste{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.liste a{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:14px 16px;background:#fff;border:1px solid var(--sable);border-radius:14px;text-decoration:none;color:var(--encre)}
+.liste .nom{font-weight:600}
+.liste .sous{grid-column:1 / -1}
+.statut{font-size:12.5px;font-weight:600;padding:2px 10px;border-radius:999px;align-self:center}
+.statut-prospect{background:#FCE9D9;color:#8A4B12}
+.statut-client{background:#DDF1EC;color:var(--turquoise)}
+.statut-perdu{background:#EEE;color:var(--gris)}
+
+.bloc{background:#fff;border:1px solid var(--sable);border-radius:16px;padding:6px 16px 10px;margin:14px 0}
+.bloc h2{margin:14px 0 6px}
+.bloc.interne{background:#F3EFF8;border-color:#D9D0E6}
+.champ{padding:10px 0;border-top:1px solid #F0E9DD}
+.champ:first-child{border-top:0}
+.libelle{display:block;font-weight:500;font-size:15px;margin-bottom:4px}
+.champ label{margin-bottom:6px}
+.saisie{display:flex;align-items:center;gap:10px}
+.saisie input{max-width:150px}
+.pastille{font-size:13px;font-weight:600;padding:4px 10px;border-radius:999px}
+.pastille.vert{background:#DDF1E4;color:var(--vert)}
+.pastille.orange{background:#FBEBD8;color:#9A5410}
+.pastille.rouge{background:#F8DEDA;color:var(--rouge)}
+.calcule{color:var(--encre-2);font-size:15px}
+
+.puces{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+.puce{min-height:44px;padding:0 14px;font-size:15px;font-weight:500;background:var(--creme-2);color:var(--encre);border:1.5px solid var(--sable)}
+.puce.choisie{background:var(--turquoise);border-color:var(--turquoise);color:#fff}
+.puce.bon.choisie{background:var(--vert);border-color:var(--vert)}
+.puce.surveiller.choisie{background:var(--orange);border-color:var(--orange)}
+.puce.prevoir.choisie{background:var(--rouge);border-color:var(--rouge)}
+.puce.absent.choisie{background:var(--gris);border-color:var(--gris)}
+.note{margin-top:8px}
+
+.constat{display:flex;flex-direction:column;gap:6px;margin:10px 0 14px}
+.photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin:8px 0}
+.photos figure{margin:0;display:flex;flex-direction:column;gap:6px}
+.photos img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px}
+.photos select{min-height:40px;padding:6px 8px;font-size:14px}
+.fichier{margin:6px 0 10px;width:100%}
+
+.barre-envoi{position:sticky;bottom:0;padding:12px 0 calc(12px + env(safe-area-inset-bottom));background:linear-gradient(180deg,rgba(247,242,234,0),var(--creme) 30%)}
+.barre-envoi button{width:100%}

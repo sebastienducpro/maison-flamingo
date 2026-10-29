@@ -104,9 +104,9 @@ if ($archivable) {
     $f = @fopen($fichier, 'a');
     if ($f && flock($f, LOCK_EX)) {
         if ($nouveau) {
-            fputcsv($f, ['date', 'prenom', 'nom', 'telephone', 'courriel', 'commune', 'interets'], ';');
+            fputcsv($f, ['date', 'prenom', 'nom', 'telephone', 'courriel', 'commune', 'interets'], ';', '"', '\\');
         }
-        fputcsv($f, array_map('cellule', [$date, $prenom, $nom, $telephone, $courriel, $commune, implode(', ', $interets)]), ';');
+        fputcsv($f, array_map('cellule', [$date, $prenom, $nom, $telephone, $courriel, $commune, implode(', ', $interets)]), ';', '"', '\\');
         flock($f, LOCK_UN);
         $archive = true;
     }
