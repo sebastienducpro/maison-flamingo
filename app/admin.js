@@ -140,7 +140,8 @@ async function vueTableau(agence) {
     ${sa ? `<p class="bandeau ${!s || s.en_retard ? 'alerte' : 'calme'}">${!s ? 'Aucune sauvegarde encore faite.' : s.en_retard ? 'La dernière sauvegarde date du ' + echapper(dateFr(s.quand)) + ' : elle est en retard.' : 'Dernière sauvegarde le ' + echapper(dateFr(s.quand)) + ', relue et complète.'} <a href="#/sauvegardes">Voir</a></p>` : ''}
     ${d.clients_sans_tournee ? `<p class="bandeau alerte">${d.clients_sans_tournee} client${d.clients_sans_tournee > 1 ? 's' : ''} sans technicien ou sans jour de passage. <a href="#/clients">Les attribuer</a></p>` : ''}
     <div class="kpis">
-      ${tuileHtml(d.statuts.client, 'clients', d.statuts.prospect + ' prospects')}
+      ${tuileHtml(d.statuts.client, 'clients actifs', d.statuts.prospect + ' prospects' + (d.statuts.veille ? ' · ' + d.statuts.veille + ' en veille' : ''))}
+      ${tuileHtml(d.desinscrits_30j, 'désinscrits sur 30 jours', (d.statuts.desinscrit + ' au total') + (d.veilles_30j ? ' · ' + d.veilles_30j + ' mises en veille' : ''), d.desinscrits_30j ? 'a-voir' : '')}
       ${tuileHtml(d.semaine.faits + ' / ' + d.semaine.prevus, 'passages cette semaine', pourcent(d.semaine.faits, d.semaine.prevus) + ' faits')}
       ${tuileHtml(d.visites_30j, 'visites sur 30 jours', d.diagnostics_30j + ' diagnostics')}
       ${tuileHtml(pourcent(d.envoyes_30j, d.visites_30j), 'rapports envoyés', 'sur 30 jours', d.visites_30j && d.envoyes_30j / d.visites_30j < 0.8 ? 'a-voir' : '')}
@@ -188,13 +189,27 @@ async function vueEquipe() {
   vue().innerHTML = `
     <h1>Équipe</h1>
     <ul class="liste">${d.membres.map((m) => `<li class="membre${m.actif ? '' : ' inactif'}">
-      <div><span class="nom">${echapper(m.nom)}</span> <span class="sous">${roles[m.role]}${m.agence ? ' · ' + echapper(m.agence) : ''}</span></div>
-      <span class="sous">${echapper(m.courriel)} · ${!m.actif ? 'désactivé' : m.en_attente ? 'invitation en attente' : m.derniere_connexion ? 'vu le ' + echapper(dateFr(m.derniere_connexion, false)) : 'jamais connecté'}${m.double_facteur ? ' · second facteur' : ''}</span>
+      <div><span class="nom">${echapper(m.nom)}</span> <span class="sous">${roles[m.role]}${m.agence ? ' · ' + echapper(m.agence) : ''}${m.role === 'technicien' ? ' · ' + m.clients + ' client' + (m.clients > 1 ? 's' : '') + (m.secteurs ? ' · ' + m.secteurs + ' secteur' + (m.secteurs > 1 ? 's' : '') : '') : ''}</span></div>
+      <span class="sous">${echapper(m.courriel)}${m.telephone ? ' · ' + echapper(m.telephone) : ''} · ${!m.actif ? 'désactivé' : m.en_attente ? 'invitation en attente' : m.derniere_connexion ? 'vu le ' + echapper(dateFr(m.derniere_connexion, false)) : 'jamais connecté'}${m.double_facteur ? ' · second facteur' : ''}</span>
       ${m.id !== APP.utilisateur.id && m.role !== 'superadmin' && (sa || m.role === 'technicien') ? `<div class="actions-ligne">
+        <button class="discret" data-modifier="${m.id}">Coordonnées</button>
         <button class="secondaire" data-lien="${m.id}">Nouveau lien d'accès</button>
         ${m.double_facteur ? `<button class="discret" data-facteur="${m.id}">Téléphone perdu</button>` : ''}
+        ${m.role === 'technicien' && m.actif ? `<button class="discret" data-remplacer="${m.id}">Remplacer</button>` : ''}
         <button class="discret" data-actif="${m.id}" data-valeur="${m.actif ? 0 : 1}">${m.actif ? 'Désactiver' : 'Réactiver'}</button>
-      </div>` : ''}
+      </div>
+      <form class="carte sous-forme" data-forme-modifier="${m.id}" hidden>
+        <div class="deux"><label>Prénom et nom<input name="nom" value="${echapper(m.nom)}" required></label><label>Téléphone<input name="telephone" type="tel" value="${echapper(m.telephone || '')}"></label></div>
+        <label>Courriel de connexion <span class="aide">le changer change son identifiant ; prévenez-le</span><input name="courriel" type="email" value="${echapper(m.courriel)}" required></label>
+        <button class="secondaire">Enregistrer</button>
+      </form>
+      <form class="carte sous-forme" data-forme-remplacer="${m.id}" hidden>
+        <p class="aide">Ses ${m.clients} client${m.clients > 1 ? 's' : ''}, leurs jours de passage, ses secteurs et ses leads ouverts passent au remplaçant. Les visites déjà faites restent signées de ${echapper(m.nom.split(' ')[0])}.</p>
+        <label>Remplaçant<select name="nouveau_id"><option value="">Une nouvelle personne</option>${d.membres.filter((x) => x.role === 'technicien' && x.actif && x.id !== m.id && x.agence_id === m.agence_id).map((x) => `<option value="${x.id}">${echapper(x.nom)}</option>`).join('')}</select></label>
+        <div class="nouvelle-personne"><div class="deux"><label>Prénom et nom<input name="nom"></label><label>Téléphone<input name="telephone" type="tel"></label></div><label>Courriel<input name="courriel" type="email"></label></div>
+        <label class="ligne"><input type="checkbox" name="desactiver" checked> Désactiver ${echapper(m.nom.split(' ')[0])} tout de suite</label>
+        <button class="principal">Transférer</button>
+      </form>` : ''}
     </li>`).join('')}</ul>
     <p class="message" id="m" role="status"></p>
     <form id="f" class="carte">
@@ -226,6 +241,32 @@ async function vueEquipe() {
     const r = await api('equipe_lien', { methode: 'POST', corps: { id, double_facteur: facteur } });
     if (r.ok) { await vueEquipe(); montrerLien(r.lien, membre.nom); }
   }));
+  vue().querySelectorAll('[data-modifier], [data-remplacer]').forEach((b) => b.addEventListener('click', () => {
+    const id = b.dataset.modifier || b.dataset.remplacer;
+    const f = vue().querySelector(`[data-forme-${b.dataset.modifier ? 'modifier' : 'remplacer'}="${id}"]`);
+    f.hidden = !f.hidden;
+  }));
+  vue().querySelectorAll('[data-forme-modifier]').forEach((f) => f.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const r = await api('equipe_modifier', { methode: 'POST', corps: { id: +f.dataset.formeModifier, ...Object.fromEntries(new FormData(f).entries()) } });
+    if (r.ok) vueEquipe(); else m.textContent = r.erreur === 'courriel_pris' ? 'Ce courriel est déjà pris.' : 'Vérifiez le courriel.';
+  }));
+  vue().querySelectorAll('[data-forme-remplacer]').forEach((f) => {
+    const sel = f.querySelector('[name=nouveau_id]'), zone = f.querySelector('.nouvelle-personne');
+    sel.addEventListener('change', () => { zone.hidden = !!sel.value; });
+    f.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const corps = Object.fromEntries(new FormData(f).entries());
+      corps.ancien_id = +f.dataset.formeRemplacer; corps.desactiver = !!corps.desactiver;
+      const membre = d.membres.find((x) => x.id === corps.ancien_id);
+      if (!confirm(`Transférer les ${membre.clients} clients et les secteurs de ${membre.nom} ?`)) return;
+      const r = await api('equipe_remplacer', { methode: 'POST', corps });
+      if (!r.ok) { m.textContent = { nouveau: 'Le remplaçant doit être un technicien actif de la même agence.', champs: 'Nom et courriel du remplaçant.', courriel_pris: 'Ce courriel a déjà un compte.' }[r.erreur] || 'Le transfert n\'a pas abouti.'; return; }
+      await vueEquipe();
+      m.textContent = `${r.clients} client${r.clients > 1 ? 's' : ''} et ${r.secteurs} secteur${r.secteurs > 1 ? 's' : ''} transférés.`;
+      if (r.lien) montrerLien(r.lien, corps.nom);
+    });
+  });
   vue().querySelectorAll('[data-actif]').forEach((b) => b.addEventListener('click', async () => {
     const actif = b.dataset.valeur === '1';
     if (!actif && !confirm('Désactiver ce compte ? Il est coupé immédiatement, sur tous ses appareils.')) return;

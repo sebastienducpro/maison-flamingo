@@ -263,7 +263,7 @@ function a_espace_carnet(): void
             'photos' => array_map(fn ($ph) => ['url' => 'api.php?action=photo&id=' . $ph['id'] . '&t=' . $x['jeton'], 'legende' => $ph['legende']], $p->fetchAll()),
         ];
     }
-    sortir(200, ['ok' => true, 'client' => ['prenom' => $c['prenom'], 'commune' => $c['commune'], 'formule' => $c['formule'], 'jour' => JOURS[(int) $c['jour_passage']] ?? null],
+    sortir(200, ['ok' => true, 'client' => ['prenom' => $c['prenom'], 'commune' => $c['commune'], 'formule' => $c['formule'], 'statut' => $c['statut'], 'jour' => $c['statut'] === 'client' ? (JOURS[(int) $c['jour_passage']] ?? null) : null],
         'historique' => $historique] + $carnet);
 }
 

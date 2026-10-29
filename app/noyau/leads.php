@@ -131,7 +131,7 @@ function a_leads(): void
     $q = base()->prepare("SELECT c.id, c.prenom, c.nom, c.telephone, c.commune, c.offre, c.origine, c.statut, c.lead_recu_le, c.lead_attribue_le, c.lead_contacte_le, c.lead_contact_par,
             t.nom AS technicien, a.nom AS agence
         FROM clients c LEFT JOIN utilisateurs t ON t.id = c.technicien_id LEFT JOIN agences a ON a.id = c.agence_id
-        WHERE ($w) AND c.lead_recu_le IS NOT NULL" . ($tous ? '' : ' AND c.lead_contacte_le IS NULL') . ' ORDER BY c.lead_recu_le ' . ($tous ? 'DESC' : 'ASC') . ' LIMIT 200');
+        WHERE ($w) AND c.lead_recu_le IS NOT NULL" . ($tous ? '' : " AND c.lead_contacte_le IS NULL AND c.statut NOT IN ('perdu', 'desinscrit')") . ' ORDER BY c.lead_recu_le ' . ($tous ? 'DESC' : 'ASC') . ' LIMIT 200');
     $q->execute($p);
     sortir(200, ['ok' => true, 'leads' => $q->fetchAll(), 'retard_h' => LEAD_RETARD_H]);
 }
@@ -237,7 +237,7 @@ function a_a_faire(): void
     $u = exiger_equipe();
     [$w, $p] = portee_clients($u);
     $db = base();
-    $l = $db->prepare("SELECT COUNT(*), SUM(julianday('now') - julianday(c.lead_attribue_le) > ?) FROM clients c WHERE ($w) AND c.lead_recu_le IS NOT NULL AND c.lead_contacte_le IS NULL");
+    $l = $db->prepare("SELECT COUNT(*), SUM(julianday('now') - julianday(c.lead_attribue_le) > ?) FROM clients c WHERE ($w) AND c.lead_recu_le IS NOT NULL AND c.lead_contacte_le IS NULL AND c.statut NOT IN ('perdu', 'desinscrit')");
     $l->execute([LEAD_RETARD_H / 24, ...$p]);
     [$leads, $retard] = $l->fetch(PDO::FETCH_NUM);
     $d = $db->prepare("SELECT COUNT(*) FROM demandes d JOIN clients c ON c.id = d.client_id WHERE ($w) AND d.traitee_le IS NULL");

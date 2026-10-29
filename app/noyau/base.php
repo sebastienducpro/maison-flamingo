@@ -11,7 +11,7 @@ date_default_timezone_set('Europe/Paris');
 // Un avertissement glissé dans une réponse casse le JSON et peut montrer un chemin du serveur.
 ini_set('display_errors', '0');
 
-const VERSION_SCHEMA = 4;
+const VERSION_SCHEMA = 5;
 const TAILLE_PHOTO_MAX = 4000000;
 const PHOTOS_MAX = 6;
 const EXPEDITEUR = 'contact@maisonflamingo.fr';
@@ -19,6 +19,13 @@ const TELEPHONE = '06 74 85 90 78';
 
 // Trois rôles d'équipe. Tout rôle absent de cette liste ne reçoit rien (refus par défaut).
 const ROLES_EQUIPE = ['superadmin', 'chef', 'technicien'];
+// Le cycle de vie d'une fiche. Seul « client » tourne ; les autres restent en base, avec leur histoire.
+//   prospect   : contact en cours, diagnostic possible, pas de passage prévu
+//   client     : actif, dans les tournées, espace client ouvert
+//   veille     : formule en pause (absence longue, travaux, impayé) ; hors tournées, espace client ouvert
+//   desinscrit : a résilié ; hors tournées, espace client fermé, carnet conservé
+//   perdu      : prospect qui n'a pas signé
+const STATUTS_CLIENT = ['prospect', 'client', 'veille', 'desinscrit', 'perdu'];
 // Qui voit plusieurs clients, ou toutes les agences, ne se connecte jamais sans second facteur.
 const ROLES_DOUBLE_FACTEUR = ['superadmin', 'chef'];
 // Un technicien ne se reconnecte pas à chaque passage ; un compte qui voit tout, si.
@@ -199,6 +206,10 @@ function migrer(PDO $db): void
     ajouter_colonne($db, 'clients', 'lead_attribue_le', 'TEXT');
     ajouter_colonne($db, 'clients', 'lead_contacte_le', 'TEXT');
     ajouter_colonne($db, 'clients', 'lead_contact_par', "TEXT NOT NULL DEFAULT ''");
+    // Version 5 : depuis quand la fiche est dans son statut, et pourquoi (veille, désinscription, perte).
+    ajouter_colonne($db, 'clients', 'statut_depuis', 'TEXT');
+    ajouter_colonne($db, 'clients', 'statut_motif', "TEXT NOT NULL DEFAULT ''");
+    $db->exec('UPDATE clients SET statut_depuis = COALESCE(statut_depuis, maj_le, cree_le)');
     ajouter_colonne($db, 'visites', 'alertes', 'INTEGER');
     ajouter_colonne($db, 'journal', 'role', "TEXT NOT NULL DEFAULT ''");
     ajouter_colonne($db, 'journal', 'agence_id', 'INTEGER');

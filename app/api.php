@@ -27,7 +27,7 @@ const ACTIONS = [
     'clients', 'client', 'client_enregistrer', 'client_supprimer', 'import_liste',
     'visite_enregistrer', 'visite_courriel', 'visite_marquer_envoyee', 'rapport', 'photo',
     'tournee', 'tournee_ordonner', 'charge', 'longues', 'geocoder_manquants',
-    'equipe', 'equipe_inviter', 'equipe_modifier', 'equipe_lien', 'agences', 'agence_enregistrer',
+    'equipe', 'equipe_inviter', 'equipe_modifier', 'equipe_lien', 'equipe_remplacer', 'agences', 'agence_enregistrer',
     'tableau', 'export', 'demandes', 'demande_traiter', 'client_inviter', 'client_compte_couper', 'journal',
     'sauvegardes', 'sauvegarde_lancer', 'sauvegarde_telecharger',
     'espace_etat', 'espace_connexion', 'espace_deconnexion', 'espace_accueil', 'espace_demande', 'espace_motdepasse',

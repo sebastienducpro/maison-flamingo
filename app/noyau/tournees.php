@@ -146,7 +146,7 @@ function bilan_journee(array $technicien, int $jour): array
 {
     $db = base();
     $q = $db->prepare("SELECT id, prenom, nom, telephone, adresse, commune, lat, lon, acces, formule, statut, ordre FROM clients
-        WHERE technicien_id = ? AND jour_passage = ? AND statut <> 'perdu' ORDER BY ordre, id");
+        WHERE technicien_id = ? AND jour_passage = ? AND statut = 'client' ORDER BY ordre, id");
     $q->execute([(int) $technicien['id'], $jour]);
     $clients = $q->fetchAll();
     $ids = array_map(fn ($c) => (int) $c['id'], $clients);

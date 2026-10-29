@@ -114,6 +114,7 @@ async function vueAccueilClient(bienvenue = false, onglet = 'sante') {
       <h1>${sante}</h1>
       ${d.postes.length ? `<div class="compteurs"><div><strong>${compte.bon}</strong>poste${compte.bon > 1 ? 's' : ''} en ordre</div><div class="s"><strong>${compte.surveiller}</strong>à surveiller</div><div class="p"><strong>${compte.prevoir}</strong>à prévoir</div></div>` : ''}
     </section>
+    ${d.client.statut === 'veille' ? '<p class="verdict a-voir">Votre formule est en pause. Votre carnet reste à vous, et nous reprenons quand vous voulez.</p>' : ''}
     ${bienvenue ? `<p class="verdict ok">Votre espace est ouvert.</p><p class="aide">${ios ? 'Pour le retrouver d\'un geste : Partager, puis « Sur l\'écran d\'accueil ».' : 'Pour le retrouver d\'un geste : menu du navigateur, puis « Ajouter à l\'écran d\'accueil ».'}</p>` : ''}
     ${dernier ? `<section class="carte-espace dernier">
       <p class="surtitre">Dernier passage · ${echapper(dateFr(dernier.quand))}</p>

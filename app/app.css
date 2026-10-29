@@ -185,3 +185,13 @@ table.charge td:last-child{padding:10px 12px}
 h2 .petit{min-height:36px;font-size:14px;padding:0 12px;margin-left:10px;vertical-align:middle}
 li.secteur .deux{margin-top:8px}
 li.secteur label{margin-bottom:6px}
+
+/* ---------- Statuts ---------- */
+.statut-veille{background:#E8E4F3;color:#4B3A7A}
+.statut-desinscrit{background:#EEE;color:#555}
+.statut-perdu{background:#F3E3E0;color:#7A2418}
+.filtres{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.filtres .puce{min-height:34px;font-size:14px;padding:0 12px}
+.sous-forme{margin-top:10px;padding:14px}
+label.ligne{flex-direction:row;align-items:center;gap:10px}
+label.ligne input{width:auto;min-height:auto}

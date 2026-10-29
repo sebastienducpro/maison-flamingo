@@ -250,6 +250,7 @@ function client_public(array $c): array
         'jour_passage' => $c['jour_passage'] !== null ? (int) $c['jour_passage'] : null, 'ordre' => (int) $c['ordre'], 'formule' => $c['formule'],
         'acces' => $c['acces'], 'lat' => $c['lat'] !== null ? (float) $c['lat'] : null, 'lon' => $c['lon'] !== null ? (float) $c['lon'] : null,
         'lead_recu_le' => $c['lead_recu_le'], 'lead_attribue_le' => $c['lead_attribue_le'], 'lead_contacte_le' => $c['lead_contacte_le'], 'lead_contact_par' => $c['lead_contact_par'],
+        'statut_depuis' => $c['statut_depuis'], 'statut_motif' => $c['statut_motif'],
     ];
 }
 
@@ -264,9 +265,12 @@ function a_clients(): void
         $p[] = '%' . $f . '%';
     }
     $statut = texte($_GET['statut'] ?? '', 20);
-    if (in_array($statut, ['prospect', 'client', 'perdu'], true)) {
+    if (in_array($statut, STATUTS_CLIENT, true)) {
         $conditions[] = 'c.statut = ?';
         $p[] = $statut;
+    } elseif ($statut === '') {
+        // Par défaut, la liste cache ce qui ne vit plus : désinscrits et perdus restent accessibles par le filtre.
+        $conditions[] = "c.statut NOT IN ('desinscrit', 'perdu')";
     }
     if ($u['role'] === 'superadmin' && entier($_GET['agence'] ?? 0) > 0) {
         $conditions[] = 'c.agence_id = ?';
@@ -355,13 +359,15 @@ function a_client_enregistrer(): void
     }
     // Le planning (technicien, jour, statut) appartient au chef et à la direction ; le technicien ne le touche pas.
     if (in_array($u['role'], ['chef', 'superadmin'], true)) {
-        $c['statut'] = in_array($d['statut'] ?? '', ['prospect', 'client', 'perdu'], true) ? $d['statut'] : ($avant['statut'] ?? 'prospect');
+        $c['statut'] = in_array($d['statut'] ?? '', STATUTS_CLIENT, true) ? $d['statut'] : ($avant['statut'] ?? 'prospect');
+        $c['statut_motif'] = texte($d['statut_motif'] ?? ($avant['statut_motif'] ?? ''), 200);
         $c['formule'] = texte($d['formule'] ?? '', 40);
         $c['technicien_id'] = technicien_valable(entier($d['technicien_id'] ?? 0), $agence);
         $jour = entier($d['jour_passage'] ?? 0);
         $c['jour_passage'] = ($jour >= 1 && $jour <= 7) ? $jour : null;
     } else {
         $c['statut'] = $avant['statut'] ?? 'prospect';
+        $c['statut_motif'] = $avant['statut_motif'] ?? '';
         $c['formule'] = $avant['formule'] ?? '';
         $c['technicien_id'] = $avant ? $avant['technicien_id'] : (int) $u['id'];
         $c['jour_passage'] = $avant['jour_passage'] ?? null;
@@ -377,6 +383,20 @@ function a_client_enregistrer(): void
     $c['lon'] = $geo ? $geo['lon'] : ($adresse_change ? null : $avant['lon']);
     $c['geo_score'] = $geo ? $geo['score'] : ($adresse_change ? null : $avant['geo_score']);
     $c['maj_le'] = maintenant();
+    // Un changement de statut se date, se trace, et a ses effets : la désinscription ferme l'espace client ;
+    // un retour en client ne le rouvre pas tout seul (il faut un nouveau lien, en connaissance de cause).
+    $change = !$avant || $avant['statut'] !== $c['statut'];
+    $c['statut_depuis'] = $change ? maintenant() : $avant['statut_depuis'];
+    if ($change && in_array($c['statut'], ['client', 'prospect'], true)) {
+        $c['statut_motif'] = '';   // un motif appartient à une pause ou une sortie, pas à un retour
+    }
+    if ($avant && $change) {
+        if ($c['statut'] === 'desinscrit') {
+            $db->prepare('UPDATE comptes_clients SET actif = 0 WHERE client_id = ?')->execute([$id]);
+            $db->prepare('DELETE FROM sessions_clients WHERE compte_id IN (SELECT id FROM comptes_clients WHERE client_id = ?)')->execute([$id]);
+        }
+        tracer($u, 'statut client', "$id {$avant['statut']} → {$c['statut']}" . ($c['statut_motif'] !== '' ? ' : ' . $c['statut_motif'] : ''));
+    }
     if ($avant && $avant['lead_recu_le'] && !$avant['lead_attribue_le'] && $c['technicien_id']) {
         $c['lead_attribue_le'] = maintenant();
         notifier_technicien_lead((int) $c['technicien_id'], $id, $c + ['interets' => $c['offre']]);
@@ -769,7 +789,9 @@ function a_geocoder_manquants(): void
 function a_equipe(): void
 {
     $u = exiger_equipe(['chef', 'superadmin']);
-    $sql = "SELECT u.id, u.nom, u.courriel, u.role, u.agence_id, u.actif, u.totp_actif, u.derniere_connexion, u.hash = '' AS en_attente, a.nom AS agence
+    $sql = "SELECT u.id, u.nom, u.courriel, u.telephone, u.role, u.agence_id, u.actif, u.totp_actif, u.derniere_connexion, u.hash = '' AS en_attente, a.nom AS agence,
+            (SELECT COUNT(*) FROM clients c WHERE c.technicien_id = u.id AND c.statut IN ('client', 'prospect', 'veille')) AS clients,
+            (SELECT COUNT(*) FROM secteurs s WHERE s.technicien_id = u.id) AS secteurs
         FROM utilisateurs u LEFT JOIN agences a ON a.id = u.agence_id";
     if ($u['role'] === 'chef') {
         $q = base()->prepare("$sql WHERE u.agence_id = ? ORDER BY u.role, u.nom");
@@ -779,7 +801,8 @@ function a_equipe(): void
     }
     $agences = $u['role'] === 'superadmin' ? base()->query('SELECT id, nom FROM agences WHERE actif = 1 ORDER BY nom')->fetchAll() : [];
     sortir(200, ['ok' => true, 'membres' => array_map(fn ($m) => [
-        'id' => (int) $m['id'], 'nom' => $m['nom'], 'courriel' => $m['courriel'], 'role' => $m['role'], 'agence' => $m['agence'],
+        'id' => (int) $m['id'], 'nom' => $m['nom'], 'courriel' => $m['courriel'], 'telephone' => $m['telephone'], 'role' => $m['role'], 'agence' => $m['agence'],
+        'clients' => (int) $m['clients'], 'secteurs' => (int) $m['secteurs'],
         'agence_id' => $m['agence_id'] !== null ? (int) $m['agence_id'] : null, 'actif' => (int) $m['actif'] === 1,
         'double_facteur' => (int) $m['totp_actif'] === 1, 'derniere_connexion' => $m['derniere_connexion'], 'en_attente' => (int) $m['en_attente'] === 1,
     ], $q->fetchAll()), 'agences' => $agences]);
@@ -827,6 +850,18 @@ function a_equipe_modifier(): void
     }
     $db = base();
     $nom = texte($d['nom'] ?? $m['nom'], 80) ?: $m['nom'];
+    $telephone = texte($d['telephone'] ?? $m['telephone'], 30);
+    $courriel = isset($d['courriel']) ? mb_strtolower(texte($d['courriel'], 120)) : $m['courriel'];
+    if (!filter_var($courriel, FILTER_VALIDATE_EMAIL)) {
+        sortir(200, ['ok' => false, 'erreur' => 'courriel']);
+    }
+    if ($courriel !== $m['courriel']) {
+        $e = $db->prepare('SELECT id FROM utilisateurs WHERE courriel = ? AND id <> ?');
+        $e->execute([$courriel, $m['id']]);
+        if ($e->fetchColumn() !== false) {
+            sortir(200, ['ok' => false, 'erreur' => 'courriel_pris']);
+        }
+    }
     $actif = array_key_exists('actif', $d) ? ($d['actif'] ? 1 : 0) : (int) $m['actif'];
     $role = $m['role'];
     $agence = $m['agence_id'];
@@ -834,7 +869,7 @@ function a_equipe_modifier(): void
         $role = in_array($d['role'] ?? '', ['chef', 'technicien'], true) ? $d['role'] : $role;
         $agence = entier($d['agence_id'] ?? $agence) ?: $agence;
     }
-    $db->prepare('UPDATE utilisateurs SET nom = ?, actif = ?, role = ?, agence_id = ? WHERE id = ?')->execute([$nom, $actif, $role, $agence, $m['id']]);
+    $db->prepare('UPDATE utilisateurs SET nom = ?, telephone = ?, courriel = ?, actif = ?, role = ?, agence_id = ? WHERE id = ?')->execute([$nom, $telephone, $courriel, $actif, $role, $agence, $m['id']]);
     $orphelins = 0;
     if (!$actif || (int) $agence !== (int) $m['agence_id'] || $role !== $m['role']) {
         // Un départ ou un changement de poste ferme ses sessions tout de suite.
@@ -843,7 +878,7 @@ function a_equipe_modifier(): void
         $o->execute([$m['id']]);
         $orphelins = (int) $o->fetchColumn();
     }
-    tracer($u, 'membre modifié', "{$m['courriel']} actif=$actif role=$role agence=$agence");
+    tracer($u, 'membre modifié', "{$m['courriel']}" . ($courriel !== $m['courriel'] ? " → $courriel" : '') . " actif=$actif role=$role agence=$agence");
     sortir(200, ['ok' => true, 'clients_a_reattribuer' => $orphelins]);
 }
 
@@ -868,6 +903,60 @@ function a_equipe_lien(): void
     $lien = url_base() . '/#/invitation/' . creer_invitation('equipe', (int) $m['id'], (int) $u['id']);
     tracer($u, 'nouveau lien de connexion', $m['courriel'] . (!empty($d['double_facteur']) ? ', second facteur remis à zéro' : ''));
     sortir(200, ['ok' => true, 'lien' => $lien]);
+}
+
+// Un technicien part, un autre arrive : ses clients, ses jours de passage, ses secteurs et ses leads
+// ouverts passent au remplaçant en une fois. Les visites déjà faites restent signées de l'ancien :
+// le carnet du client dit qui est vraiment passé.
+function a_equipe_remplacer(): void
+{
+    $u = exiger_equipe(['chef', 'superadmin']);
+    exiger_post();
+    $d = entree();
+    $ancien = membre_gerable($u, entier($d['ancien_id'] ?? 0));
+    if (!$ancien || $ancien['role'] !== 'technicien') {
+        tracer($u, 'remplacement refusé', (string) ($d['ancien_id'] ?? ''));
+        sortir(404, ['ok' => false, 'erreur' => 'introuvable']);
+    }
+    $db = base();
+    $nouveau_id = entier($d['nouveau_id'] ?? 0);
+    $lien = null;
+    if ($nouveau_id > 0) {
+        $nouveau = membre_gerable($u, $nouveau_id);
+        if (!$nouveau || $nouveau['role'] !== 'technicien' || (int) $nouveau['agence_id'] !== (int) $ancien['agence_id'] || (int) $nouveau['actif'] !== 1) {
+            sortir(200, ['ok' => false, 'erreur' => 'nouveau']);
+        }
+    } else {
+        // Le remplaçant n'a pas encore de compte : on le crée dans la même agence, et on rend son lien d'accès.
+        $nom = texte($d['nom'] ?? '', 80);
+        $courriel = mb_strtolower(texte($d['courriel'] ?? '', 120));
+        if ($nom === '' || !filter_var($courriel, FILTER_VALIDATE_EMAIL)) {
+            sortir(200, ['ok' => false, 'erreur' => 'champs']);
+        }
+        $e = $db->prepare('SELECT id FROM utilisateurs WHERE courriel = ?');
+        $e->execute([$courriel]);
+        if ($e->fetchColumn() !== false) {
+            sortir(200, ['ok' => false, 'erreur' => 'courriel_pris']);
+        }
+        $db->prepare("INSERT INTO utilisateurs (courriel, nom, telephone, hash, cree_le, role, agence_id, actif) VALUES (?,?,?,'',?,'technicien',?,1)")
+            ->execute([$courriel, $nom, texte($d['telephone'] ?? '', 30), maintenant(), $ancien['agence_id']]);
+        $nouveau_id = (int) $db->lastInsertId();
+        $lien = url_base() . '/#/invitation/' . creer_invitation('equipe', $nouveau_id, (int) $u['id']);
+    }
+    $db->beginTransaction();
+    $c = $db->prepare('UPDATE clients SET technicien_id = ?, maj_le = ? WHERE technicien_id = ?');
+    $c->execute([$nouveau_id, maintenant(), $ancien['id']]);
+    $clients = $c->rowCount();
+    $s = $db->prepare('UPDATE secteurs SET technicien_id = ?, maj_le = ? WHERE technicien_id = ?');
+    $s->execute([$nouveau_id, maintenant(), $ancien['id']]);
+    $secteurs = $s->rowCount();
+    if (!empty($d['desactiver'])) {
+        $db->prepare('UPDATE utilisateurs SET actif = 0 WHERE id = ?')->execute([$ancien['id']]);
+        $db->prepare('DELETE FROM sessions WHERE utilisateur_id = ?')->execute([$ancien['id']]);
+    }
+    $db->commit();
+    tracer($u, 'technicien remplacé', "{$ancien['courriel']} → $nouveau_id : $clients clients, $secteurs secteurs" . (!empty($d['desactiver']) ? ', ancien désactivé' : ''));
+    sortir(200, ['ok' => true, 'nouveau_id' => $nouveau_id, 'clients' => $clients, 'secteurs' => $secteurs, 'lien' => $lien]);
 }
 
 function a_agences(): void
@@ -926,7 +1015,7 @@ function a_tableau(): void
         $q->execute($params);
         return $q->fetch(PDO::FETCH_NUM);
     };
-    $statuts = ['prospect' => 0, 'client' => 0, 'perdu' => 0];
+    $statuts = array_fill_keys(STATUTS_CLIENT, 0);
     $q = $db->prepare("SELECT statut, COUNT(*) FROM clients c WHERE $w GROUP BY statut");
     $q->execute($p);
     foreach ($q->fetchAll(PDO::FETCH_NUM) as [$s, $n]) {
@@ -940,6 +1029,7 @@ function a_tableau(): void
     [$diagnostiques, $convertis] = $un("SELECT COUNT(*), SUM(c.statut = 'client') FROM clients c WHERE $w AND EXISTS (SELECT 1 FROM visites v WHERE v.client_id = c.id AND v.type = 'diagnostic')", $p);
     [$comptes] = $un("SELECT COUNT(*) FROM comptes_clients cc JOIN clients c ON c.id = cc.client_id WHERE $w AND cc.actif = 1", $p);
     [$sans_jour] = $un("SELECT COUNT(*) FROM clients c WHERE $w AND c.statut = 'client' AND (c.jour_passage IS NULL OR c.technicien_id IS NULL)", $p);
+    [$desinscrits30, $veilles30] = $un("SELECT SUM(c.statut = 'desinscrit' AND c.statut_depuis >= ?), SUM(c.statut = 'veille' AND c.statut_depuis >= ?) FROM clients c WHERE $w", [$il_y_a(30), $il_y_a(30), ...$p]);
     // Les points qui reviennent le plus : là où sont les travaux à proposer.
     // Les clés partent telles quelles : l'écran les traduit avec les libellés des formulaires.
     $points = [];
@@ -976,7 +1066,7 @@ function a_tableau(): void
         $t = $db->prepare("SELECT id, nom FROM utilisateurs WHERE role = 'technicien' AND actif = 1 AND agence_id = ? ORDER BY nom");
         $t->execute([$agence]);
         foreach ($t->fetchAll() as $m) {
-            $x = $un("SELECT (SELECT COUNT(*) FROM clients WHERE technicien_id = ? AND statut <> 'perdu'),
+            $x = $un("SELECT (SELECT COUNT(*) FROM clients WHERE technicien_id = ? AND statut IN ('client', 'prospect', 'veille')),
                 (SELECT COUNT(*) FROM visites WHERE technicien_id = ? AND quand >= ?),
                 (SELECT COUNT(*) FROM clients WHERE technicien_id = ? AND statut = 'client' AND jour_passage IS NOT NULL),
                 (SELECT COUNT(DISTINCT client_id) FROM visites WHERE technicien_id = ? AND type = 'passage' AND quand >= ?),
@@ -1005,7 +1095,7 @@ function a_tableau(): void
         'mesurees_30j' => (int) $mesurees30, 'duree_passage_moyenne' => $duree30 !== null ? (int) round((float) $duree30) : null,
         'semaine' => ['prevus' => (int) $prevus, 'faits' => (int) $faits], 'demandes_en_attente' => (int) $attente,
         'conversion' => ['diagnostiques' => (int) $diagnostiques, 'devenus_clients' => (int) $convertis],
-        'comptes_clients' => (int) $comptes, 'clients_sans_tournee' => (int) $sans_jour,
+        'comptes_clients' => (int) $comptes, 'clients_sans_tournee' => (int) $sans_jour, 'desinscrits_30j' => (int) $desinscrits30, 'veilles_30j' => (int) $veilles30,
         'points_frequents' => array_slice(array_map(fn ($k, $n) => ['point' => $k, 'nombre' => $n], array_keys($points), $points), 0, 8),
         'detail' => $detail, 'detail_par' => ($u['role'] === 'superadmin' && !$agence) ? 'agence' : 'technicien',
     ];
@@ -1028,8 +1118,8 @@ function a_export(): void
     if ($genre === 'clients') {
         $q = $db->prepare("SELECT c.*, a.nom AS agence, t.nom AS technicien FROM clients c LEFT JOIN agences a ON a.id = c.agence_id LEFT JOIN utilisateurs t ON t.id = c.technicien_id WHERE $w ORDER BY a.nom, c.nom");
         $q->execute($p);
-        envoyer_csv("clients-$jour.csv", ['Agence', 'Prénom', 'Nom', 'Téléphone', 'Courriel', 'Adresse', 'Commune', 'Statut', 'Formule', 'Technicien', 'Jour', 'Créé le'],
-            array_map(fn ($c) => [$c['agence'], $c['prenom'], $c['nom'], $c['telephone'], $c['courriel'], $c['adresse'], $c['commune'], $c['statut'], $c['formule'], $c['technicien'], JOURS[(int) $c['jour_passage']] ?? '', substr($c['cree_le'], 0, 10)], $q->fetchAll()));
+        envoyer_csv("clients-$jour.csv", ['Agence', 'Prénom', 'Nom', 'Téléphone', 'Courriel', 'Adresse', 'Commune', 'Statut', 'Depuis le', 'Motif', 'Formule', 'Technicien', 'Jour', 'Créé le'],
+            array_map(fn ($c) => [$c['agence'], $c['prenom'], $c['nom'], $c['telephone'], $c['courriel'], $c['adresse'], $c['commune'], $c['statut'], substr((string) $c['statut_depuis'], 0, 10), $c['statut_motif'], $c['formule'], $c['technicien'], JOURS[(int) $c['jour_passage']] ?? '', substr($c['cree_le'], 0, 10)], $q->fetchAll()));
     }
     // Les liens de rapport ne sortent pas : un tableur qui circule ne doit pas ouvrir les rapports.
     $q = $db->prepare("SELECT v.quand, v.type, v.auteur, v.alertes, v.duree_min, v.charge, v.envoye_le, v.donnees, c.prenom, c.nom, c.commune, a.nom AS agence
@@ -1079,6 +1169,10 @@ function a_client_inviter(): void
     $u = exiger_equipe();
     exiger_post();
     $c = exiger_client_autorise($u, entier(entree()['id'] ?? 0));
+    if ($c['statut'] === 'desinscrit') {
+        tracer($u, 'espace client refusé', $c['id'] . ' désinscrit');
+        sortir(200, ['ok' => false, 'erreur' => 'desinscrit']);
+    }
     $lien = url_base() . '/espace.html#/invitation/' . creer_invitation('client', (int) $c['id'], (int) $u['id']);
     tracer($u, 'espace client : lien créé', (string) $c['id']);
     sortir(200, ['ok' => true, 'lien' => $lien]);

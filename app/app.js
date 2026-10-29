@@ -272,16 +272,24 @@ function vueConnexion() {
 
 /* ---------- Les clients ---------- */
 
-const STATUTS = { prospect: 'Prospect', client: 'Client', perdu: 'Perdu' };
+const STATUTS = { prospect: 'Prospect', client: 'Actif', veille: 'En veille', desinscrit: 'Désinscrit', perdu: 'Perdu' };
+const AIDE_STATUT = {
+  prospect: 'Contact en cours. Pas de passage prévu, mais le diagnostic est possible.',
+  client: 'Dans les tournées, espace client ouvert.',
+  veille: 'Formule en pause : hors tournées, mais le client garde son espace et son carnet.',
+  desinscrit: 'A résilié : hors tournées, espace client fermé, carnet conservé.',
+  perdu: 'Prospect qui n\'a pas signé. Sort des leads en attente.',
+};
 
 async function vueClients() {
   vue().innerHTML = '<p class="chargement">Chargement…</p>';
   const role = APP.utilisateur.role;
   let horsLigne = false;
   // La recherche se fait au serveur : à deux mille clients, on n'envoie pas tout au téléphone.
+  let filtre = '';
   const charger = async (q = '', debut = 0) => {
     try {
-      const d = await api('clients', { params: { q, debut } });
+      const d = await api('clients', { params: { q, debut, statut: filtre } });
       if (d.ok) garderFiches(d.clients.map(({ derniere_visite, technicien_nom, agence_nom, ...c }) => c));
       return d;
     } catch (e) {
@@ -299,6 +307,7 @@ async function vueClients() {
       <a class="bouton principal" href="#/client/nouveau">Nouveau</a>
     </div>
     <input id="cherche" class="recherche" type="search" placeholder="Nom, commune, téléphone">
+    <div class="filtres" id="filtres">${[['', 'En vie'], ['client', 'Actifs'], ['prospect', 'Prospects'], ['veille', 'En veille'], ['desinscrit', 'Désinscrits'], ['perdu', 'Perdus']].map(([k, l]) => `<button type="button" class="puce${k === filtre ? ' choisie' : ''}" data-filtre="${k}">${l}</button>`).join('')}</div>
     ${role !== 'technicien' ? `<div class="actions-ligne">
       <button id="importer" class="secondaire">Importer la liste d'attente</button>
       <a class="bouton secondaire" href="api.php?action=export&genre=clients">Exporter</a>
@@ -322,6 +331,13 @@ async function vueClients() {
   document.getElementById('cherche').addEventListener('input', (e) => {
     clearTimeout(minuteur);
     minuteur = setTimeout(async () => { d = await charger(e.target.value.trim()); tous = d.clients; dessiner(); }, 300);
+  });
+  document.getElementById('filtres').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-filtre]');
+    if (!b) return;
+    filtre = b.dataset.filtre;
+    document.querySelectorAll('#filtres .puce').forEach((p) => p.classList.toggle('choisie', p === b));
+    d = await charger(document.getElementById('cherche').value.trim()); tous = d.clients; dessiner();
   });
   document.getElementById('plus').addEventListener('click', async () => {
     const suite = await charger(document.getElementById('cherche').value.trim(), tous.length);
@@ -380,6 +396,7 @@ async function vueClient(id) {
     </div>
     ${c.lead_recu_le && !c.lead_contacte_le ? `<div class="bandeau alerte lead-ouvert"><strong>Lead reçu ${echapper(dateFr(c.lead_recu_le))}</strong>${c.origine ? ' · ' + echapper(c.origine) : ''}${c.technicien_id ? '' : ' · <strong>aucun technicien</strong>'}. Appeler ou envoyer un SMS compte comme premier contact. <button class="secondaire" id="contact-fait">Premier contact fait</button></div>`
       : c.lead_contacte_le ? `<p class="aide">Lead du ${echapper(dateFr(c.lead_recu_le, false))}, premier contact ${echapper(dateFr(c.lead_contacte_le))} par ${echapper(c.lead_contact_par)}.</p>` : ''}
+    ${['veille', 'desinscrit', 'perdu'].includes(c.statut) ? `<p class="bandeau ${c.statut === 'veille' ? 'calme' : 'alerte'}"><strong>${STATUTS[c.statut]}</strong>${c.statut_depuis ? ' depuis le ' + echapper(dateFr(c.statut_depuis, false)) : ''}${c.statut_motif ? ' · ' + echapper(c.statut_motif) : ''}. ${c.statut === 'veille' ? 'Hors tournées, espace client ouvert.' : c.statut === 'desinscrit' ? 'Hors tournées, espace client fermé.' : 'Sorti des leads.'}</p>` : ''}
     ${c.acces ? `<p class="acces"><strong>Accès</strong> ${echapper(c.acces)}</p>` : ''}
     <div class="gros-boutons">
       <a class="bouton principal" href="#/visite/${c.id}/diagnostic">Faire un diagnostic</a>
@@ -416,9 +433,11 @@ async function vueClient(id) {
       <fieldset class="planning"><legend>Planning</legend>
         ${role === 'superadmin' && d.agences && d.agences.length ? `<label>Agence<select name="agence_id">${d.agences.map((a) => `<option value="${a.id}"${a.id === c.agence_id ? ' selected' : ''}>${echapper(a.nom)}</option>`).join('')}</select></label>` : ''}
         <div class="deux">
-          <label>Statut<select name="statut">${Object.entries(STATUTS).map(([k, l]) => `<option value="${k}"${k === c.statut ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+          <label>Statut<select name="statut">${Object.entries(STATUTS).map(([k, l]) => `<option value="${k}"${k === c.statut ? ' selected' : ''}>${l}</option>`).join('')}</select>
+            <span class="aide" id="aide-statut">${AIDE_STATUT[c.statut] || ''}${c.statut_depuis ? ' Depuis le ' + echapper(dateFr(c.statut_depuis, false)) + '.' : ''}</span></label>
           <label>Formule<select name="formule">${['', 'Piscine', 'Piscine + Maison fermée', 'Maison fermée'].map((f) => `<option${f === c.formule ? ' selected' : ''} value="${f}">${f || '–'}</option>`).join('')}</select></label>
         </div>
+        <label id="motif-statut"${['veille', 'desinscrit', 'perdu'].includes(c.statut) ? '' : ' hidden'}>Motif <span class="aide">absence, travaux, impayé, déménagement, concurrent, prix…</span><input name="statut_motif" value="${echapper(c.statut_motif || '')}"></label>
         <div class="deux">
           <label>Technicien<select name="technicien_id"><option value="">À attribuer</option>${(d.techniciens || []).map((t) => `<option value="${t.id}"${t.id === c.technicien_id ? ' selected' : ''}>${echapper(t.nom)}</option>`).join('')}</select></label>
           <label>Jour de passage<select name="jour_passage"><option value="">–</option>${Object.entries(JOURS).map(([k, l]) => `<option value="${k}"${+k === c.jour_passage ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
@@ -445,6 +464,11 @@ async function vueClient(id) {
     sessionStorage.setItem('dernier_envoi', JSON.stringify({ id: v.id, lien: v.lien, type: v.type, deja: v.envoye_le, client: { prenom: c.prenom, telephone: c.telephone, courriel: c.courriel, id: c.id } }));
     aller('#/envoi');
   }));
+  const selStatut = vue().querySelector('select[name="statut"]');
+  if (selStatut) selStatut.addEventListener('change', () => {
+    document.getElementById('aide-statut').textContent = AIDE_STATUT[selStatut.value] || '';
+    document.getElementById('motif-statut').hidden = !['veille', 'desinscrit', 'perdu'].includes(selStatut.value);
+  });
   const selAgence = vue().querySelector('select[name="agence_id"]');
   if (selAgence && d.tousTechniciens) selAgence.addEventListener('change', () => {
     const a = +selAgence.value, sel = vue().querySelector('select[name="technicien_id"]');
@@ -454,7 +478,7 @@ async function vueClient(id) {
   if (inviter) inviter.addEventListener('click', async () => {
     const m = document.getElementById('m-espace');
     const r = await api('client_inviter', { methode: 'POST', corps: { id: c.id } });
-    if (!r.ok) { m.textContent = 'Le lien n\'a pas pu être créé.'; return; }
+    if (!r.ok) { m.textContent = r.erreur === 'desinscrit' ? 'Client désinscrit : repassez-le en Actif ou En veille avant de rouvrir son espace.' : 'Le lien n\'a pas pu être créé.'; return; }
     const texte = `Bonjour ${c.prenom}, voici votre accès à votre espace Maison Flamingo : vos rapports et votre jour de passage. Le lien sert une fois, pendant sept jours : ${r.lien}`;
     const sms = lienSms(c.telephone, texte);
     m.innerHTML = `Lien prêt, valable sept jours et une seule fois : <code class="lien">${echapper(r.lien)}</code> ${sms ? `<a class="bouton principal" href="${sms}">L'envoyer par SMS</a>` : ''} <button class="secondaire" id="copier-espace">Copier le lien</button>`;
