@@ -11,16 +11,22 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icone.png" type="image/png">
 <link rel="apple-touch-icon" href="icone.png">
-<link rel="stylesheet" href="app.css?v=1">
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css?v=1.9.4">
+<link rel="stylesheet" href="app.css?v=2">
 </head>
 <body>
 <header class="barre">
-  <a class="marque" href="#/clients"><img src="flamant.png" alt="" width="20" height="30"><span>Maison <strong>Flamingo</strong></span></a>
+  <a class="marque" href="#/"><img src="flamant.png" alt="" width="20" height="30"><span>Maison <strong>Flamingo</strong></span></a>
   <span class="etat"><span id="attente" class="attente" hidden></span><span id="qui"></span></span>
 </header>
+<nav id="nav" class="menu" hidden></nav>
 <main id="vue"><p class="chargement">Chargement…</p></main>
-<script src="commun.js?v=1"></script>
-<script src="formulaires.js?v=1"></script>
-<script src="app.js?v=1"></script>
+<script src="vendor/leaflet/leaflet.js?v=1.9.4"></script>
+<script src="vendor/qrcode.js?v=1.4.4"></script>
+<script src="commun.js?v=2"></script>
+<script src="formulaires.js?v=2"></script>
+<script src="app.js?v=2"></script>
+<script src="admin.js?v=2"></script>
+<script src="tournee.js?v=2"></script>
 </body>
 </html>

@@ -1,0 +1,26 @@
+/* L'espace client : même charte que le rapport, des boutons faits pour le pouce. */
+.carte-espace{background:#fff;border:1px solid var(--sable);border-radius:16px;padding:20px 18px;margin:16px 0}
+.carte-espace.etroite{max-width:440px;margin:30px auto}
+.carte-espace h1{font-size:28px;font-weight:300;margin-bottom:10px}
+.carte-espace h2{font-size:18px;font-weight:600;margin-bottom:10px}
+label{display:flex;flex-direction:column;gap:6px;font-weight:500;font-size:15px;margin-bottom:14px}
+input,textarea{font:inherit;font-size:17px;color:var(--encre);background:#fff;border:1.5px solid var(--sable);border-radius:12px;padding:12px 14px;min-height:50px;width:100%}
+input:focus,textarea:focus{outline:3px solid var(--lagon);border-color:var(--eau)}
+button,.bouton{font:inherit;font-size:16px;font-weight:600;border:0;border-radius:999px;min-height:52px;padding:0 22px;display:inline-flex;align-items:center;justify-content:center;text-decoration:none;cursor:pointer;background:var(--turquoise);color:#fff;width:100%}
+.bouton.clair,button.clair{background:#fff;color:var(--turquoise);border:1.5px solid var(--turquoise)}
+.discret{background:transparent;color:var(--gris);min-height:40px;font-weight:500;width:auto}
+.message{min-height:1.4em;color:var(--turquoise);font-weight:500}
+.prochain{background:linear-gradient(160deg,var(--nuit),var(--violet));color:var(--creme);border-radius:18px;padding:20px 18px;margin:16px 0}
+.prochain .grand-jour{font-family:'Josefin Sans',sans-serif;font-size:30px;font-weight:600;color:var(--or)}
+.historique{list-style:none;margin:0;padding:0}
+.historique li a{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:14px 0;border-top:1px solid #F0E9DD;text-decoration:none;color:var(--encre)}
+.historique li:first-child a{border-top:0}
+.historique .quand{margin:0;font-size:14px}
+.etiquette{font-size:12.5px;font-weight:600;padding:2px 10px;border-radius:999px;align-self:center}
+.etiquette.ok{background:#DDF1E4;color:var(--vert)}
+.etiquette.voir{background:#FBEBD8;color:#9A5410}
+.demandes{list-style:none;margin:10px 0 0;padding:0}
+.demandes li{padding:10px 0;border-top:1px solid #F0E9DD;font-size:15px}
+.demandes .reponse{color:var(--turquoise);margin:4px 0 0}
+.pied{text-align:center;color:var(--gris);font-size:14px;padding:20px 16px 40px}
+.aide{color:var(--gris);font-size:14px}

@@ -93,3 +93,76 @@ button:disabled{opacity:.5}
 
 .barre-envoi{position:sticky;bottom:0;padding:12px 0 calc(12px + env(safe-area-inset-bottom));background:linear-gradient(180deg,rgba(247,242,234,0),var(--creme) 30%)}
 .barre-envoi button{width:100%}
+
+/* ---------- Menu par rôle ---------- */
+.menu{position:sticky;top:calc(54px + env(safe-area-inset-top));z-index:19;display:flex;gap:4px;overflow-x:auto;padding:8px 12px;background:var(--creme-2);border-bottom:1px solid var(--sable);scrollbar-width:none}
+.menu::-webkit-scrollbar{display:none}
+.menu a{flex:0 0 auto;padding:8px 14px;border-radius:999px;text-decoration:none;color:var(--encre-2);font-weight:500;font-size:15px}
+.menu a[aria-current="page"]{background:var(--violet);color:var(--creme)}
+
+/* ---------- Bandeaux, indicateurs ---------- */
+.bandeau{border-radius:12px;padding:12px 14px;font-size:15px;margin:0 0 12px}
+.bandeau.alerte{background:#FBE1DC;color:#7A2418}
+.bandeau.calme{background:#E3F2EF;color:#174F4A}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin:8px 0 6px}
+.kpi{background:#fff;border:1px solid var(--sable);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:2px}
+.kpi-val{font-size:26px;font-weight:700;color:var(--violet);line-height:1.1}
+.kpi-lib{font-size:14px;color:var(--encre-2)}
+.kpi-sous{font-size:12.5px;color:var(--gris)}
+.kpi.a-voir{border-color:var(--orange);background:#FFF6EC}
+.barres{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.barres li{display:grid;grid-template-columns:minmax(110px,1fr) 2fr auto;gap:10px;align-items:center;font-size:15px}
+.barres meter{width:100%;height:12px}
+.table-defile{overflow-x:auto;margin:6px 0;border:1px solid var(--sable);border-radius:14px;background:#fff}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--creme);vertical-align:top}
+th{font-weight:600;color:var(--gris);font-size:13px;background:var(--creme-2)}
+tr.refus td{background:#FFF4F1}
+select#agence,select#tech{width:auto;min-height:44px;font-size:15px}
+
+/* ---------- Équipe, demandes, accès ---------- */
+.liste li.membre,.liste li.demande{padding:14px 16px;background:#fff;border:1px solid var(--sable);border-radius:14px}
+.liste li.inactif{opacity:.55}
+.liste li.demande p{margin:6px 0}
+.liste li.traitee{opacity:.7}
+.acces{background:#FFF7E8;border-left:4px solid var(--sunset);border-radius:8px;padding:8px 12px;margin:8px 0;font-size:15px}
+.lien{display:block;word-break:break-all;margin:8px 0}
+.qr{max-width:240px;margin:12px auto}
+.qr svg{width:100%;height:auto}
+.planning{border:1px solid var(--sable);border-radius:12px;padding:12px 14px 0;margin:0 0 14px}
+.planning legend{font-weight:600;padding:0 6px}
+.zone-danger{margin-top:28px;text-align:center}
+.danger{color:var(--rouge)}
+
+/* ---------- Tournée ---------- */
+.jours{display:flex;gap:6px;margin:6px 0 12px}
+.jours a{flex:1;text-align:center;padding:10px 0;border-radius:12px;background:#fff;border:1px solid var(--sable);text-decoration:none;color:var(--encre-2);font-weight:600}
+.jours a[aria-current="page"]{background:var(--turquoise);color:#fff;border-color:var(--turquoise)}
+.resume{display:grid;gap:4px;background:#fff;border:1px solid var(--sable);border-radius:14px;padding:12px 14px;font-size:15px;margin-bottom:10px}
+.proposition-ordre .principal{min-height:44px;margin-top:8px}
+.carte-tournee{height:340px;border-radius:16px;overflow:hidden;border:1px solid var(--sable);margin:8px 0;background:var(--creme-2)}
+.repere{background:var(--violet);color:#fff;border:2px solid #fff;border-radius:50%;display:flex!important;align-items:center;justify-content:center;font-weight:700;font-size:13px;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+.repere.fait{background:var(--eau)}
+.repere.depart{background:var(--rose);color:var(--nuit)}
+.arrets{list-style:none;margin:12px 0;padding:0;display:grid;gap:10px}
+.arrets li{display:grid;grid-template-columns:36px 1fr;gap:10px;background:#fff;border:1px solid var(--sable);border-radius:14px;padding:12px}
+.arrets li.fait{background:#F1F8F6}
+.arrets .numero{width:32px;height:32px;border-radius:50%;background:var(--violet);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700}
+.arrets li.fait .numero{background:var(--eau)}
+.arrets .nom{font-weight:600;text-decoration:none;color:var(--encre)}
+.arrets .sous{display:block}
+
+/* ---------- Semaine ---------- */
+table.charge td{text-align:center;padding:0}
+table.charge td:first-child{text-align:left;padding:10px 12px;font-weight:600}
+table.charge td a{display:block;padding:10px 6px;text-decoration:none;color:var(--encre);font-size:13.5px}
+.jour-vide{color:var(--gris)}
+.jour-legere{background:#F3F6F5}
+.jour-bonne{background:#DDF1EC}
+.jour-pleine{background:#FDEBD5}
+.jour-lourde{background:#F9D3CC}
+.legende-charge{display:flex;flex-wrap:wrap;gap:6px;font-size:13px}
+.legende-charge span{padding:3px 10px;border-radius:999px}
+td.date{white-space:nowrap}
+table.charge td{vertical-align:middle}
+table.charge td:last-child{padding:10px 12px}

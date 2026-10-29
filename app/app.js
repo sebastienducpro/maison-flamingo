@@ -19,7 +19,8 @@ async function api(action, { methode = 'GET', corps = null, params = {}, formula
   let d = {};
   try { d = await r.json(); } catch (e) { d = {}; }
   d.statut = r.status;
-  if (r.status === 401) { APP.utilisateur = null; oublierQui(); aller('#/connexion'); }
+  if (r.status === 401 && d.erreur === 'double_facteur') demarrer();
+  else if (r.status === 401 && !String(action).startsWith('invitation')) { APP.utilisateur = null; oublierQui(); aller('#/connexion'); }
   return d;
 }
 
@@ -131,27 +132,63 @@ async function demarrer() {
     vue().innerHTML = '<section class="carte"><h1>Pas de connexion au serveur</h1><p>Vérifiez le réseau, puis rechargez la page.</p></section>';
     return;
   }
+  if (location.hash.startsWith('#/invitation/')) return vueInvitation(location.hash.split('/')[2]);
+  if (etat.etape) return vueDoubleFacteur(etat.etape);
   APP.utilisateur = etat.utilisateur;
   if (APP.utilisateur) garderQui(APP.utilisateur); else oublierQui();
   document.getElementById('qui').textContent = APP.utilisateur ? APP.utilisateur.nom : '';
+  dessinerNav();
   if (!etat.installee) return vueInstaller();
   if (!APP.utilisateur) return vueConnexion();
   viderFile();
   route();
 }
 
+// Chaque rôle a son point de départ : la tournée pour qui est sur le terrain, le tableau pour qui pilote.
+function accueilDuRole() {
+  return APP.utilisateur && APP.utilisateur.role !== 'technicien' ? '#/tableau' : '#/tournee';
+}
+
+const MENUS = {
+  technicien: [['#/tournee', 'Tournée'], ['#/clients', 'Clients'], ['#/demandes', 'Demandes'], ['#/compte', 'Compte']],
+  chef: [['#/tableau', 'Tableau'], ['#/tournee', 'Tournées'], ['#/charge', 'Semaine'], ['#/clients', 'Clients'], ['#/equipe', 'Équipe'], ['#/demandes', 'Demandes'], ['#/compte', 'Compte']],
+  superadmin: [['#/tableau', 'Tableau'], ['#/tournee', 'Tournées'], ['#/charge', 'Semaine'], ['#/clients', 'Clients'], ['#/equipe', 'Équipe'], ['#/agences', 'Agences'], ['#/demandes', 'Demandes'], ['#/sauvegardes', 'Sauvegardes'], ['#/journal', 'Journal'], ['#/compte', 'Compte']],
+};
+
+function dessinerNav() {
+  const nav = document.getElementById('nav');
+  if (!nav) return;
+  const menu = APP.utilisateur ? MENUS[APP.utilisateur.role] || [] : [];
+  nav.hidden = !menu.length;
+  const ici = '#/' + (location.hash.slice(2).split('/')[0] || '');
+  nav.innerHTML = menu.map(([h, l]) => `<a href="${h}"${h === ici ? ' aria-current="page"' : ''}>${l}</a>`).join('');
+}
+
 async function route() {
-  const h = location.hash || '#/clients';
+  const h = location.hash && location.hash !== '#/' ? location.hash : accueilDuRole();
   const morceaux = h.slice(2).split('/');
+  if (morceaux[0] === 'invitation') return vueInvitation(morceaux[1]);
   if (!APP.utilisateur && morceaux[0] !== 'connexion') return vueConnexion();
   majBadge();
+  dessinerNav();
+  window.scrollTo(0, 0);
   try {
     switch (morceaux[0]) {
       case 'connexion': return await vueConnexion();
       case 'client': return await vueClient(morceaux[1]);
       case 'visite': return await vueVisite(morceaux[1], morceaux[2]);
       case 'envoi': return await vueEnvoi();
-      default: return await vueClients();
+      case 'tournee': return await vueTournee(morceaux[1], morceaux[2]);
+      case 'charge': return await vueCharge(morceaux[1]);
+      case 'tableau': return await vueTableau(morceaux[1]);
+      case 'equipe': return await vueEquipe();
+      case 'agences': return await vueAgences();
+      case 'demandes': return await vueDemandes();
+      case 'sauvegardes': return await vueSauvegardes();
+      case 'journal': return await vueJournal();
+      case 'compte': return await vueCompte();
+      case 'clients': return await vueClients();
+      default: return aller(accueilDuRole());
     }
   } catch (e) {
     vue().innerHTML = `<section class="carte"><h1>Pas de réseau</h1><p>Cette page a besoin du réseau. Les visites déjà saisies sont gardées sur le téléphone et partiront toutes seules.</p><a class="retour" href="#/clients">← Clients</a></section>`;
@@ -202,13 +239,9 @@ function vueConnexion() {
     ev.preventDefault();
     const f = ev.target, m = document.getElementById('m');
     const d = await api('connexion', { methode: 'POST', corps: { courriel: f.courriel.value, motdepasse: f.motdepasse.value } });
-    if (d.ok) {
-      APP.utilisateur = d.utilisateur;
-      garderQui(d.utilisateur);
-      document.getElementById('qui').textContent = d.utilisateur.nom;
-      aller('#/clients');
-      viderFile();
-    } else {
+    if (d.ok && d.etape) vueDoubleFacteur(d.etape);
+    else if (d.ok) { history.replaceState(null, '', '#/'); demarrer(); }
+    else {
       m.textContent = d.erreur === 'trop' ? 'Trop d\'essais. Réessayez dans un quart d\'heure.' : 'Courriel ou mot de passe incorrect.';
     }
   });
@@ -220,38 +253,59 @@ const STATUTS = { prospect: 'Prospect', client: 'Client', perdu: 'Perdu' };
 
 async function vueClients() {
   vue().innerHTML = '<p class="chargement">Chargement…</p>';
-  let d, horsLigne = false;
-  try { d = await api('clients'); } catch (e) { d = null; }
-  if (d && d.ok) garderFiches(d.clients);
-  else if (!d) { horsLigne = true; d = { ok: true, clients: await fichesGardees() }; }
+  const role = APP.utilisateur.role;
+  let horsLigne = false;
+  // La recherche se fait au serveur : à deux mille clients, on n'envoie pas tout au téléphone.
+  const charger = async (q = '', debut = 0) => {
+    try {
+      const d = await api('clients', { params: { q, debut } });
+      if (d.ok) garderFiches(d.clients.map(({ derniere_visite, technicien_nom, agence_nom, ...c }) => c));
+      return d;
+    } catch (e) {
+      horsLigne = true;
+      const f = (await fichesGardees()).filter((c) => !q || [c.prenom, c.nom, c.commune, c.telephone].join(' ').toLowerCase().includes(q.toLowerCase()));
+      return { ok: true, clients: f, total: f.length };
+    }
+  };
+  let d = await charger();
   if (!d.ok) return;
-  const tous = d.clients;
   vue().innerHTML = `
     ${horsLigne ? BANDEAU_HORS_LIGNE : ''}
     <div class="tete">
-      <h1>Clients</h1>
+      <h1>Clients <span class="aide" id="total"></span></h1>
       <a class="bouton principal" href="#/client/nouveau">Nouveau</a>
     </div>
-    <input id="cherche" class="recherche" type="search" placeholder="Rechercher un nom, une commune, un numéro">
-    <div class="actions-ligne">
+    <input id="cherche" class="recherche" type="search" placeholder="Nom, commune, téléphone">
+    ${role !== 'technicien' ? `<div class="actions-ligne">
       <button id="importer" class="secondaire">Importer la liste d'attente</button>
-      <button id="sortir" class="discret">Se déconnecter</button>
-    </div>
+      <a class="bouton secondaire" href="api.php?action=export&genre=clients">Exporter</a>
+    </div>` : ''}
     <p class="message" id="m" role="status"></p>
-    <ul class="liste" id="liste"></ul>`;
-  const dessiner = (filtre) => {
-    const f = filtre.trim().toLowerCase();
-    const choisis = tous.filter((c) => !f || [c.prenom, c.nom, c.commune, c.telephone].join(' ').toLowerCase().includes(f));
-    document.getElementById('liste').innerHTML = choisis.length ? choisis.map((c) => `
+    <ul class="liste" id="liste"></ul>
+    <button class="secondaire" id="plus" hidden>Voir les suivants</button>`;
+  let tous = d.clients;
+  const dessiner = () => {
+    document.getElementById('total').textContent = d.total ? d.total + (d.total > 1 ? ' fiches' : ' fiche') : '';
+    document.getElementById('liste').innerHTML = tous.length ? tous.map((c) => `
       <li><a href="#/client/${c.id}">
         <span class="nom">${echapper((c.prenom + ' ' + c.nom).trim())}</span>
         <span class="statut statut-${c.statut}">${STATUTS[c.statut] || ''}</span>
-        <span class="sous">${echapper(c.commune || 'Commune ?')}${c.derniere_visite ? ' · vu ' + echapper(dateFr(c.derniere_visite, false)) : ''}</span>
-      </a></li>`).join('') : '<li class="vide">Aucun client pour l\'instant.</li>';
+        <span class="sous">${echapper(c.commune || 'Commune ?')}${c.jour_passage ? ' · ' + JOURS[c.jour_passage] : ''}${role !== 'technicien' && c.technicien_nom ? ' · ' + echapper(c.technicien_nom) : ''}${c.derniere_visite ? ' · vu ' + echapper(dateFr(c.derniere_visite, false)) : ''}</span>
+      </a></li>`).join('') : '<li class="vide">Aucun client.</li>';
+    document.getElementById('plus').hidden = tous.length >= (d.total || 0);
   };
-  dessiner('');
-  document.getElementById('cherche').addEventListener('input', (e) => dessiner(e.target.value));
-  document.getElementById('importer').addEventListener('click', async () => {
+  dessiner();
+  let minuteur = null;
+  document.getElementById('cherche').addEventListener('input', (e) => {
+    clearTimeout(minuteur);
+    minuteur = setTimeout(async () => { d = await charger(e.target.value.trim()); tous = d.clients; dessiner(); }, 300);
+  });
+  document.getElementById('plus').addEventListener('click', async () => {
+    const suite = await charger(document.getElementById('cherche').value.trim(), tous.length);
+    tous = tous.concat(suite.clients); dessiner();
+  });
+  const imp = document.getElementById('importer');
+  if (imp) imp.addEventListener('click', async () => {
     const m = document.getElementById('m');
     m.textContent = 'Import en cours…';
     const r = await api('import_liste', { methode: 'POST', corps: {} });
@@ -259,84 +313,142 @@ async function vueClients() {
     m.textContent = r.ajoutes + ' inscrit' + (r.ajoutes > 1 ? 's' : '') + ' ajouté' + (r.ajoutes > 1 ? 's' : '') + ', ' + r.deja + ' déjà présent' + (r.deja > 1 ? 's' : '') + '.';
     if (r.ajoutes) setTimeout(() => vueClients(), 900);
   });
-  document.getElementById('sortir').addEventListener('click', async () => {
-    try { await api('deconnexion', { methode: 'POST', corps: {} }); } catch (e) {}
-    APP.utilisateur = null;
-    oublierQui();
-    document.getElementById('qui').textContent = '';
-    aller('#/connexion');
-  });
+}
+
+const JOURS = { 1: 'Lundi', 2: 'Mardi', 3: 'Mercredi', 4: 'Jeudi', 5: 'Vendredi', 6: 'Samedi', 7: 'Dimanche' };
+const CHARGES = { leger: 'Légère', normal: 'Normale', lourd: 'Lourde' };
+
+function lienSms(tel, texte) {
+  const t = (tel || '').replace(/[^\d+]/g, '');
+  return t ? `sms:${t}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(texte)}` : '';
 }
 
 async function vueClient(id) {
-  let c = { id: 0, prenom: '', nom: '', telephone: '', courriel: '', adresse: '', commune: '', statut: 'prospect', offre: '', notes: '' };
-  let visites = [], horsLigne = false;
+  const role = APP.utilisateur.role, pilote = role !== 'technicien';
+  let c = { id: 0, prenom: '', nom: '', telephone: '', courriel: '', adresse: '', commune: '', statut: 'prospect', offre: '', notes: '', acces: '', formule: '', technicien_id: null, jour_passage: null, agence_id: APP.utilisateur.agence_id };
+  let d = { visites: [], demandes: [], compte: null, techniciens: [], agences: [] }, horsLigne = false;
   if (id !== 'nouveau') {
     vue().innerHTML = '<p class="chargement">Chargement…</p>';
-    let d;
-    try { d = await api('client', { params: { id } }); } catch (e) { d = null; }
-    if (!d) {
+    let r;
+    try { r = await api('client', { params: { id } }); } catch (e) { r = null; }
+    if (!r) {
       const garde = await ficheGardee(id);
       if (!garde) throw new Error('hors ligne');
-      d = { ok: true, client: garde, visites: [] };
+      r = { ok: true, client: garde, visites: [], demandes: [] };
       horsLigne = true;
-    } else if (d.ok) garderFiches([d.client]);
-    if (!d.ok) { vue().innerHTML = '<section class="carte"><p>Client introuvable.</p><a href="#/clients">Retour</a></section>'; return; }
-    c = d.client; visites = d.visites;
+    } else if (r.ok) garderFiches([r.client]);
+    if (!r.ok) { vue().innerHTML = '<section class="carte"><p>Client introuvable.</p><a href="#/clients">Retour</a></section>'; return; }
+    c = r.client; d = r;
+  } else if (pilote) {
+    // Une fiche neuve : la direction choisit l'agence, et la liste des techniciens suit.
+    try { const e = await api('equipe'); d.techniciens = e.membres.filter((m) => m.role === 'technicien' && m.actif && (!c.agence_id || m.agence_id === c.agence_id)); d.agences = e.agences; d.tousTechniciens = e.membres; } catch (err) { /* hors ligne : la fiche s'enregistrera sans planning */ }
   }
   APP.client = c;
   const nouveau = !c.id;
   const tel = (c.telephone || '').replace(/[^\d+]/g, '');
+  const visites = d.visites || [];
+  const ouvertes = (d.demandes || []).filter((x) => !x.traitee_le);
   vue().innerHTML = `
     ${horsLigne ? BANDEAU_HORS_LIGNE : ''}
     <a class="retour" href="#/clients">← Clients</a>
     ${nouveau ? '<h1>Nouveau client</h1>' : `
     <div class="tete">
-      <div><h1>${echapper((c.prenom + ' ' + c.nom).trim())}</h1><p class="sous">${echapper(c.commune)} · ${STATUTS[c.statut] || ''}</p></div>
+      <div><h1>${echapper((c.prenom + ' ' + c.nom).trim())}</h1><p class="sous">${[echapper(c.commune), STATUTS[c.statut], c.jour_passage ? JOURS[c.jour_passage] : '', d.duree_estimee ? 'environ ' + d.duree_estimee + ' min' : ''].filter(Boolean).join(' · ')}</p></div>
     </div>
+    ${c.acces ? `<p class="acces"><strong>Accès</strong> ${echapper(c.acces)}</p>` : ''}
     <div class="gros-boutons">
       <a class="bouton principal" href="#/visite/${c.id}/diagnostic">Faire un diagnostic</a>
       <a class="bouton principal clair" href="#/visite/${c.id}/passage">Saisir un passage</a>
     </div>
     <div class="actions-ligne">
       ${tel ? `<a class="bouton secondaire" href="tel:${tel}">Appeler</a><a class="bouton secondaire" href="sms:${tel}">SMS</a>` : ''}
-      ${c.adresse ? `<a class="bouton secondaire" href="https://maps.apple.com/?q=${encodeURIComponent(c.adresse + ' ' + c.commune)}" rel="noopener">Itinéraire</a>` : ''}
+      ${c.adresse ? `<a class="bouton secondaire" href="https://maps.apple.com/?daddr=${encodeURIComponent(c.adresse + ' ' + c.commune)}" rel="noopener">Itinéraire</a>` : ''}
     </div>
+    ${ouvertes.length ? `<h2>Demandes du client</h2><ul class="liste">${ouvertes.map((x) => `<li class="demande"><p>${echapper(x.texte)}</p><span class="sous">${echapper(dateFr(x.cree_le))}</span><a class="bouton secondaire" href="#/demandes">Répondre</a></li>`).join('')}</ul>` : ''}
     <h2>Visites</h2>
     <ul class="liste">${horsLigne ? '<li class="vide">L\'historique s\'affichera avec du réseau.</li>' : visites.length ? visites.map((v, i) => `
       <li><a href="#/envoi" data-visite="${i}">
-        <span class="nom">${v.type === 'diagnostic' ? 'Diagnostic' : 'Passage'}</span>
+        <span class="nom">${v.type === 'diagnostic' ? 'Diagnostic' : 'Passage'}${v.alertes ? ` <span class="pastille ${v.alertes > 2 ? 'rouge' : 'orange'}">${v.alertes} point${v.alertes > 1 ? 's' : ''}</span>` : ''}</span>
         <span class="statut ${v.envoye_le ? 'statut-client' : 'statut-perdu'}">${v.envoye_le ? 'Envoyé' : 'Pas envoyé'}</span>
-        <span class="sous">${echapper(dateFr(v.quand))} · ${echapper(v.auteur)}</span>
+        <span class="sous">${echapper(dateFr(v.quand))} · ${echapper(v.auteur)}${v.duree_min ? ' · ' + v.duree_min + ' min' : ''}${v.charge ? ' · charge ' + CHARGES[v.charge].toLowerCase() : ''}</span>
       </a></li>`).join('') : '<li class="vide">Aucune visite.</li>'}</ul>
+    ${!horsLigne ? `<h2>Espace client</h2>
+    <div class="carte">
+      <p>${d.compte ? (d.compte.actif ? `Ouvert pour <strong>${echapper(d.compte.courriel)}</strong>${d.compte.derniere_connexion ? ', dernière visite le ' + echapper(dateFr(d.compte.derniere_connexion, false)) : ', jamais connecté'}.` : 'Fermé.') : 'Pas encore ouvert. Le client reçoit un lien, choisit son mot de passe, et retrouve ses rapports et son jour de passage.'}</p>
+      <div class="actions-ligne"><button class="secondaire" id="inviter">${d.compte ? 'Nouveau lien d\'accès' : 'Ouvrir son espace'}</button>${d.compte && d.compte.actif && pilote ? '<button class="discret" id="couper">Fermer l\'accès</button>' : ''}</div>
+      <p class="message" id="m-espace" role="status"></p>
+    </div>` : ''}
     <h2>Fiche</h2>`}
     <form id="fiche" class="carte">
       <div class="deux"><label>Prénom<input name="prenom" value="${echapper(c.prenom)}"></label><label>Nom<input name="nom" value="${echapper(c.nom)}"></label></div>
       <div class="deux"><label>Téléphone<input name="telephone" type="tel" value="${echapper(c.telephone)}"></label><label>Courriel<input name="courriel" type="email" value="${echapper(c.courriel)}"></label></div>
-      <label>Adresse<input name="adresse" value="${echapper(c.adresse)}"></label>
-      <div class="deux"><label>Commune<input name="commune" value="${echapper(c.commune)}"></label>
-        <label>Statut<select name="statut">${Object.entries(STATUTS).map(([k, l]) => `<option value="${k}"${k === c.statut ? ' selected' : ''}>${l}</option>`).join('')}</select></label></div>
+      <label>Adresse<input name="adresse" value="${echapper(c.adresse)}" autocomplete="street-address"></label>
+      <label>Commune<input name="commune" value="${echapper(c.commune)}"></label>
+      ${!nouveau && c.adresse && c.lat == null ? '<p class="aide">Cette adresse n\'a pas été trouvée sur la carte : vérifiez le numéro et la commune.</p>' : ''}
+      <label>Accès <span class="aide">code du portail, chien, où se garer : visible par l'équipe seulement</span><textarea name="acces" rows="2">${echapper(c.acces)}</textarea></label>
+      ${pilote ? `
+      <fieldset class="planning"><legend>Planning</legend>
+        ${role === 'superadmin' && d.agences && d.agences.length ? `<label>Agence<select name="agence_id">${d.agences.map((a) => `<option value="${a.id}"${a.id === c.agence_id ? ' selected' : ''}>${echapper(a.nom)}</option>`).join('')}</select></label>` : ''}
+        <div class="deux">
+          <label>Statut<select name="statut">${Object.entries(STATUTS).map(([k, l]) => `<option value="${k}"${k === c.statut ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+          <label>Formule<select name="formule">${['', 'Piscine', 'Piscine + Maison fermée', 'Maison fermée'].map((f) => `<option${f === c.formule ? ' selected' : ''} value="${f}">${f || '–'}</option>`).join('')}</select></label>
+        </div>
+        <div class="deux">
+          <label>Technicien<select name="technicien_id"><option value="">À attribuer</option>${(d.techniciens || []).map((t) => `<option value="${t.id}"${t.id === c.technicien_id ? ' selected' : ''}>${echapper(t.nom)}</option>`).join('')}</select></label>
+          <label>Jour de passage<select name="jour_passage"><option value="">–</option>${Object.entries(JOURS).map(([k, l]) => `<option value="${k}"${+k === c.jour_passage ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+        </div>
+      </fieldset>` : ''}
       <label>Ce qui l'intéresse<input name="offre" value="${echapper(c.offre)}"></label>
       <label>Notes<textarea name="notes" rows="4">${echapper(c.notes)}</textarea></label>
       <button class="principal">${nouveau ? 'Créer la fiche' : 'Enregistrer la fiche'}</button>
       <p class="message" id="m" role="status"></p>
-    </form>`;
+    </form>
+    ${!nouveau && pilote && !horsLigne ? `<p class="zone-danger"><button class="discret danger" id="supprimer">Supprimer la fiche, ses visites et ses photos</button></p>` : ''}`;
+
   vue().querySelectorAll('[data-visite]').forEach((a) => a.addEventListener('click', (ev) => {
     ev.preventDefault();
     const v = visites[+a.dataset.visite];
     sessionStorage.setItem('dernier_envoi', JSON.stringify({ id: v.id, lien: v.lien, type: v.type, deja: v.envoye_le, client: { prenom: c.prenom, telephone: c.telephone, courriel: c.courriel, id: c.id } }));
     aller('#/envoi');
   }));
+  const selAgence = vue().querySelector('select[name="agence_id"]');
+  if (selAgence && d.tousTechniciens) selAgence.addEventListener('change', () => {
+    const a = +selAgence.value, sel = vue().querySelector('select[name="technicien_id"]');
+    sel.innerHTML = '<option value="">À attribuer</option>' + d.tousTechniciens.filter((t) => t.role === 'technicien' && t.actif && t.agence_id === a).map((t) => `<option value="${t.id}">${echapper(t.nom)}</option>`).join('');
+  });
+  const inviter = document.getElementById('inviter');
+  if (inviter) inviter.addEventListener('click', async () => {
+    const m = document.getElementById('m-espace');
+    const r = await api('client_inviter', { methode: 'POST', corps: { id: c.id } });
+    if (!r.ok) { m.textContent = 'Le lien n\'a pas pu être créé.'; return; }
+    const texte = `Bonjour ${c.prenom}, voici votre accès à votre espace Maison Flamingo : vos rapports et votre jour de passage. Le lien sert une fois, pendant sept jours : ${r.lien}`;
+    const sms = lienSms(c.telephone, texte);
+    m.innerHTML = `Lien prêt, valable sept jours et une seule fois : <code class="lien">${echapper(r.lien)}</code> ${sms ? `<a class="bouton principal" href="${sms}">L'envoyer par SMS</a>` : ''} <button class="secondaire" id="copier-espace">Copier le lien</button>`;
+    document.getElementById('copier-espace').addEventListener('click', async () => { try { await navigator.clipboard.writeText(r.lien); } catch (e) { /* le lien reste affiché */ } });
+  });
+  const couper = document.getElementById('couper');
+  if (couper) couper.addEventListener('click', async () => {
+    if (!confirm('Fermer l\'accès de ce client à son espace ?')) return;
+    await api('client_compte_couper', { methode: 'POST', corps: { id: c.id } });
+    vueClient(c.id);
+  });
+  const supprimer = document.getElementById('supprimer');
+  if (supprimer) supprimer.addEventListener('click', async () => {
+    const nomComplet = (c.prenom + ' ' + c.nom).trim();
+    if (prompt(`Tout sera effacé pour de bon : la fiche, les visites, les photos, l'espace client.\nTapez le nom « ${nomComplet} » pour confirmer.`) !== nomComplet) return;
+    const r = await api('client_supprimer', { methode: 'POST', corps: { id: c.id } });
+    if (r.ok) { try { await MEMOIRE.effacer('fiches', c.id); } catch (e) { /* rien à effacer */ } aller('#/clients'); }
+  });
   document.getElementById('fiche').addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const f = ev.target, m = document.getElementById('m');
     const corps = Object.fromEntries(new FormData(f).entries());
     corps.id = c.id;
-    let d;
-    try { d = await api('client_enregistrer', { methode: 'POST', corps }); } catch (e) { m.textContent = 'Pas de réseau : la fiche n\'est pas enregistrée. Réessayez tout à l\'heure.'; return; }
-    if (!d.ok) { m.textContent = d.erreur === 'nom' ? 'Il faut au moins un prénom ou un nom.' : 'L\'enregistrement n\'a pas abouti.'; return; }
-    m.textContent = 'Fiche enregistrée.';
-    if (nouveau) aller('#/client/' + d.id);
+    let r;
+    try { r = await api('client_enregistrer', { methode: 'POST', corps }); } catch (e) { m.textContent = 'Pas de réseau : la fiche n\'est pas enregistrée. Réessayez tout à l\'heure.'; return; }
+    if (!r.ok) { m.textContent = r.erreur === 'nom' ? 'Il faut au moins un prénom ou un nom.' : 'L\'enregistrement n\'a pas abouti.'; return; }
+    m.textContent = corps.adresse && !r.carte ? 'Fiche enregistrée. L\'adresse n\'a pas été trouvée sur la carte.' : 'Fiche enregistrée.';
+    if (nouveau) aller('#/client/' + r.id);
   });
 }
 
@@ -455,10 +567,14 @@ async function vueVisite(idClient, type) {
   if (!d.ok) return;
   const client = d.client;
   const cle = 'brouillon:' + idClient + ':' + type;
-  const vide = { valeurs: {}, etats: {}, interne: {}, constats: [{ texte: '', niveau: '' }, { texte: '', niveau: '' }, { texte: '', niveau: '' }], proposition: { formule: '', note: '' }, ouvertes: [] };
+  const vide = { valeurs: {}, etats: {}, interne: {}, constats: [{ texte: '', niveau: '' }, { texte: '', niveau: '' }, { texte: '', niveau: '' }], proposition: { formule: '', note: '' }, ouvertes: [], debut: Date.now(), duree: '', charge: '', acces: null };
   let brouillon = null;
   try { brouillon = await MEMOIRE.lire('brouillons', cle); } catch (e) { brouillon = null; }
-  const etat = brouillon ? brouillon.etat : vide;
+  const etat = brouillon ? { debut: Date.now(), duree: '', charge: '', acces: null, ...brouillon.etat } : vide;
+  if (etat.acces === null) etat.acces = client.acces || '';
+  // Le temps passé se mesure seul, de l'ouverture du formulaire à l'enregistrement : c'est ce qui
+  // permet ensuite d'équilibrer les journées. Le technicien corrige s'il a ouvert trop tôt.
+  const minutesMesurees = () => Math.max(1, Math.min(600, Math.round((Date.now() - etat.debut) / 60000)));
   const photos = brouillon ? brouillon.photos.map((p) => ({ ...p, url: URL.createObjectURL(p.blob) })) : [];
 
   let minuteur = null;
@@ -489,6 +605,15 @@ async function vueVisite(idClient, type) {
     <a class="retour" href="#/client/${client.id}">← ${echapper((client.prenom + ' ' + client.nom).trim())}</a>
     <h1>${formulaire.titre}${brouillon ? ' <span class="aide">brouillon repris</span>' : ''}</h1>
     <form id="visite" novalidate>${sectionsHtml.join('')}
+      <section class="bloc interne"><h2>Fin de visite <span class="aide">jamais montré au client</span></h2>
+        <div class="champ"><label for="fin-duree">Temps passé <span class="unite">min</span></label>
+          <span class="aide" id="duree-mesuree">Mesuré depuis l'ouverture : ${minutesMesurees()} min. Laissez vide pour garder cette mesure.</span>
+          <input id="fin-duree" data-fin="duree" type="number" inputmode="numeric" min="1" max="600" value="${echapper(etat.duree)}"></div>
+        <div class="champ"><span class="libelle">Charge de cette visite</span>
+          <div class="puces" data-charge>${Object.entries(CHARGES).map(([k, l]) => `<button type="button" class="puce${etat.charge === k ? ' choisie' : ''}" data-valeur="${k}">${l}</button>`).join('')}</div></div>
+        <div class="champ"><label for="fin-acces">Accès <span class="aide">code, chien, stationnement : repris à la prochaine visite</span></label>
+          <textarea id="fin-acces" data-fin="acces" rows="2">${echapper(etat.acces)}</textarea></div>
+      </section>
       <div class="barre-envoi"><button class="principal" id="enregistrer">Enregistrer et préparer l'envoi</button></div>
       <p class="message" id="m" role="status"></p>
     </form>`;
@@ -501,6 +626,11 @@ async function vueVisite(idClient, type) {
       <button type="button" class="discret" data-retirer="${i}">Retirer</button></figure>`).join('');
   };
   dessinerPhotos();
+  const horloge = setInterval(() => {
+    const z = document.getElementById('duree-mesuree');
+    if (!z) { clearInterval(horloge); return; }
+    z.textContent = `Mesuré depuis l'ouverture : ${minutesMesurees()} min. Laissez vide pour garder cette mesure.`;
+  }, 30000);
 
   const rafraichirCalculs = () => {
     MESURES && Object.keys(MESURES).forEach((k) => {
@@ -523,6 +653,7 @@ async function vueVisite(idClient, type) {
     else if (t.dataset.constat !== undefined) etat.constats[+t.dataset.constat].texte = t.value;
     else if (t.hasAttribute('data-proposition-note')) etat.proposition.note = t.value;
     else if (t.dataset.legende !== undefined) photos[+t.dataset.legende].legende = t.value;
+    else if (t.dataset.fin) etat[t.dataset.fin] = t.value;
     rafraichirCalculs();
     garder();
   });
@@ -562,6 +693,9 @@ async function vueVisite(idClient, type) {
       const c = etat.constats[+groupe.dataset.constatNiveau];
       c.niveau = c.niveau === b.dataset.valeur ? '' : b.dataset.valeur;
       groupe.querySelectorAll('.puce').forEach((p) => p.classList.toggle('choisie', p.dataset.valeur === c.niveau));
+    } else if (groupe.hasAttribute('data-charge')) {
+      etat.charge = etat.charge === b.dataset.valeur ? '' : b.dataset.valeur;
+      groupe.querySelectorAll('.puce').forEach((p) => p.classList.toggle('choisie', p.dataset.valeur === etat.charge));
     } else if (groupe.hasAttribute('data-formule')) {
       etat.proposition.formule = etat.proposition.formule === b.dataset.valeur ? '' : b.dataset.valeur;
       groupe.querySelectorAll('.puce').forEach((p) => p.classList.toggle('choisie', p.dataset.valeur === etat.proposition.formule));
@@ -601,7 +735,8 @@ async function vueVisite(idClient, type) {
     }
     const envoi = {
       identifiant_local: identifiant,
-      visite: { client_id: client.id, type, identifiant_local: identifiant, quand: new Date().toISOString(), contenu, legendes: photos.map((p) => p.legende) },
+      visite: { client_id: client.id, type, identifiant_local: identifiant, quand: new Date().toISOString(), contenu, legendes: photos.map((p) => p.legende),
+        duree_min: +etat.duree || minutesMesurees(), charge: etat.charge, acces: etat.acces },
       photos: photos.map((p) => ({ blob: p.blob })),
       client: { prenom: client.prenom, telephone: client.telephone, courriel: client.courriel, id: client.id },
     };
@@ -672,4 +807,5 @@ function vueEnvoi() {
   });
 }
 
-demarrer();
+// Les écrans de pilotage et de tournée sont dans d'autres fichiers : on démarre quand tous sont chargés.
+document.addEventListener('DOMContentLoaded', demarrer);

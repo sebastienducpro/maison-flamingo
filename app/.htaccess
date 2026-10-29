@@ -5,5 +5,8 @@ Options -Indexes
   Header always set Referrer-Policy "no-referrer"
   Header always set X-Content-Type-Options "nosniff"
   Header always set X-Frame-Options "DENY"
-  Header always set Content-Security-Policy "default-src 'self'; img-src 'self' data: blob:; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+  # Le navigateur refuse ensuite tout retour en http pendant un an : pas de session interceptée sur un wifi public.
+  Header always set Strict-Transport-Security "max-age=31536000"
+  Header always set Permissions-Policy "camera=(self), geolocation=(self), microphone=()"
+  Header always set Content-Security-Policy "default-src 'self'; img-src 'self' data: blob: https://data.geopf.fr; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
 </IfModule>
