@@ -343,3 +343,7 @@ legend{font-size:14px;font-weight:500;margin-bottom:6px;padding:0}
 .page-legale .section{min-height:100vh}
 .legal h3{font-family:var(--titre);font-size:20px;font-weight:600;margin:34px 0 10px}
 .legal p{color:var(--encre-2);margin-bottom:10px}
+
+/* Sans style en ligne : la politique de contenu du site les refuse. */
+.symboles{position:absolute;width:0;height:0;overflow:hidden}
+.espace-haut{margin-top:32px}

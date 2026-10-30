@@ -1,2 +1,17 @@
 # Les fichiers du dépôt qui ne sont pas le site restent invisibles en ligne.
 RedirectMatch 404 ^/(README\.md|\.gitignore|\.git/.*)$
+Options -Indexes
+
+# Le site public reçoit le formulaire de la liste d'attente : il mérite les mêmes verrous de navigateur que l'outil.
+# L'outil (app/) pose ses propres en-têtes, plus stricts, qui remplacent ceux-ci sous /app.
+<IfModule mod_headers.c>
+  # Un an sans retour possible en http : un formulaire ne doit jamais partir en clair sur un wifi public.
+  Header always set Strict-Transport-Security "max-age=31536000"
+  Header always set X-Content-Type-Options "nosniff"
+  # Personne ne peut afficher le site dans sa propre page pour faire remplir le formulaire à sa place.
+  Header always set X-Frame-Options "DENY"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+  # Seuls le site lui-même et les polices Google peuvent charger quoi que ce soit ; le formulaire ne part que vers le site.
+  Header always set Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests"
+</IfModule>
