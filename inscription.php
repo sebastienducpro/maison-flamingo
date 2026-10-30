@@ -10,7 +10,9 @@ declare(strict_types=1);
 
 const DESTINATAIRE = 'contact@maisonflamingo.fr';
 const COMMUNES = ['Manduel', 'Bouillargues', 'Marguerittes', 'Caissargues', 'Rodilhan', 'Garons', 'Nîmes', 'Autre commune'];
-const INTERETS = ['Piscine', 'Maison fermée'];
+const INTERETS = ['Piscine', 'Maison', 'Veille de résidence', 'Maison fermée'];
+// Une page restée en cache envoie encore l'ancien nom de la veille : on le traduit au lieu de le perdre
+const ANCIENS_INTERETS = ['Maison fermée' => 'Veille de résidence'];
 const MAX_PAR_HEURE = 5;
 
 header('Content-Type: application/json; charset=utf-8');
@@ -57,6 +59,7 @@ $telephone = champ($d, 'telephone', 30);
 $courriel = champ($d, 'courriel', 120);
 $commune = champ($d, 'commune', 40);
 $interets = array_values(array_intersect(INTERETS, is_array($d['interets'] ?? null) ? $d['interets'] : []));
+$interets = array_values(array_unique(array_map(fn ($x) => ANCIENS_INTERETS[$x] ?? $x, $interets)));
 $accord = ($d['consentement'] ?? false) === true;
 
 $erreurs = [];
