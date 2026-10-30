@@ -69,10 +69,12 @@
   if (diag && TARIFS[p.formule]) {
     const t = TARIFS[p.formule];
     const sms = 'sms:+33674859078' + (/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?') + 'body=' + encodeURIComponent('Bonjour, je souhaite réserver mon jour de passage Maison Flamingo.');
+    // Le prix est celui figé dans la visite ; un bassin hors normes ou une formule sans prix se disent sans chiffre.
+    const tarif = p.fondateur === false ? 'tarif standard' : 'tarif fondateurs';
     blocProposition = `<section class="bloc proposition">
       <h2>Notre proposition</h2>
-      <p class="formule">${echapper(t.libelle)}</p>
-      <p class="prix">${p.prix} € <small>TTC par mois, tarif fondateurs</small></p>
+      <p class="formule">${echapper(p.libelle || t.libelle)}</p>
+      ${p.prix !== null && p.prix !== undefined ? `<p class="prix">${p.prix} € <small>TTC par mois, ${tarif}</small></p>` : `<p class="prix"><small>${p.raison === 'devis' ? 'Sur devis, après mesure de votre bassin' : 'Prix sur demande'}</small></p>`}
       <p class="detail">${echapper(t.detail)}${p.supplement ? '. Le tarif tient compte d\'un bassin de plus de ' + SURFACE_STANDARD + ' m²' : ''}.</p>
       ${p.note ? `<p class="mot">« ${echapper(p.note)} »</p>` : ''}
       <div class="actions"><a class="bouton" href="${sms}">Réserver mon jour de passage</a><a class="bouton clair" href="tel:+33674859078">Nous appeler</a></div>

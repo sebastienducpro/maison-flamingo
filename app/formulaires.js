@@ -3,14 +3,33 @@
 // ligne ici l'ajoute aux deux, et rien ne peut diverger entre ce qu'on saisit et
 // ce que le client lit. Les sections « interne » ne sortent jamais vers le client.
 
+// Les formules et leurs prix par défaut, les mêmes que FORMULES côté serveur. Le diagnostic se fait souvent sans
+// réseau : l'écran part de ces valeurs, puis prend la grille de la direction dès qu'il l'a lue une fois (chargerGrille).
+// Le contrat, lui, est toujours chiffré par le serveur.
 const TARIFS = {
-  piscine: { libelle: 'Piscine', prix: 149, detail: 'Chaque semaine d\'avril à octobre, produits, remise en route et hivernage compris' },
-  pack:    { libelle: 'Piscine + Maison fermée', prix: 179, detail: 'La piscine chaque semaine et la maison veillée, dans la même visite' },
-  maison:  { libelle: 'Maison fermée', prix: 49, detail: 'Une visite complète chaque mois, et après chaque coup de vent' },
+  piscine:          { libelle: 'Piscine', prix: 179, fondateur: 149, piscine: true, detail: 'Chaque semaine d\'avril à octobre, produits, remise en route et hivernage compris' },
+  quinzaine:        { libelle: 'Piscine équipée, quinzaine hors été', prix: null, fondateur: null, piscine: true, detail: 'Chaque semaine l\'été, tous les quinze jours au printemps et à l\'automne, pour un bassin équipé d\'automatismes' },
+  pack:             { libelle: 'Piscine + Maison', pack: ['piscine', 'maison'], piscine: true, detail: 'La piscine chaque semaine, et le jardin, le petit bricolage et la vigilance de la maison' },
+  maison:           { libelle: 'Maison', prix: 45, fondateur: 45, piscine: false, detail: 'Petits travaux de jardinage, petit bricolage et vigilance de la maison, surtout d\'automne au printemps' },
+  maison_renforcee: { libelle: 'Maison renforcée', prix: 100, fondateur: 100, piscine: false, detail: 'Environ deux heures d\'intervention chaque mois : jardin, petit bricolage, vigilance' },
+  veille:           { libelle: 'Veille de résidence', prix: 49, fondateur: 49, piscine: false, detail: 'Une visite complète chaque mois de la maison inoccupée, et après chaque coup de vent' },
 };
-// Hypothèse à valider sur les premiers relevés : au-delà de 10 × 5 m, les produits coûtent plus.
+let REMISE_PACK = 12;
+// La taille du bassin, comme au contrat : jusqu'à 50 m² le prix de la formule, de 50 à 80 m² +20 %, au-delà sur devis.
 const SURFACE_STANDARD = 50;
-const SUPPLEMENT_GRAND_BASSIN = 20;
+const SURFACE_MAJOREE = 80;
+const MAJORATION_PCT = 20;
+
+function appliquerGrille(g) {
+  if (!g) return;
+  Object.values(g).forEach((f) => {
+    const t = TARIFS[f.cle];
+    if (!t) return;
+    if (f.pack) { REMISE_PACK = f.remise; return; }
+    t.prix = f.prix; t.fondateur = f.fondateur;
+  });
+}
+try { appliquerGrille(JSON.parse(localStorage.getItem('flamingo_grille') || 'null')); } catch (e) {}
 
 const ETAT_CHOIX = ['bon', 'surveiller', 'prevoir', 'absent'];
 
@@ -118,10 +137,23 @@ function volumeBassin(v) {
   return [L, l, p].every(Number.isFinite) ? Math.round(L * l * p) : null;
 }
 
-function prixPropose(formule, valeurs) {
+// Le prix proposé au diagnostic, calculé comme au contrat : majoration sur la piscine, puis remise de pack sur la piscine.
+// Rend null sans formule ; prix null avec une raison (« sur devis », « à fixer ») quand le chiffre ne peut pas se dire.
+function prixPropose(formule, valeurs, fondateur = true) {
   const t = TARIFS[formule];
   if (!t) return null;
+  const parts = (t.pack || [formule]).map((k) => TARIFS[k]);
+  const base = parts.map((x) => (fondateur ? x.fondateur : x.prix));
+  if (base.some((b) => b === null || b === undefined)) return { prix: null, raison: 'a_fixer', fondateur };
   const surface = parseFloat(valeurs.longueur) * parseFloat(valeurs.largeur);
-  const grand = formule !== 'maison' && Number.isFinite(surface) && surface > SURFACE_STANDARD;
-  return { prix: t.prix + (grand ? SUPPLEMENT_GRAND_BASSIN : 0), supplement: grand };
+  if (t.piscine && Number.isFinite(surface) && surface > SURFACE_MAJOREE) return { prix: null, raison: 'devis', fondateur };
+  const grand = t.piscine && Number.isFinite(surface) && surface > SURFACE_STANDARD;
+  const prix = parts.reduce((s, x, i) => s + (x.piscine ? Math.round(base[i] * (grand ? 1 + MAJORATION_PCT / 100 : 1)) - (t.pack ? REMISE_PACK : 0) : base[i]), 0);
+  return { prix, supplement: grand, fondateur };
+}
+
+function textePrixPropose(c) {
+  if (!c) return '';
+  if (c.prix === null) return c.raison === 'devis' ? '<strong>Sur devis</strong> : bassin de plus de ' + SURFACE_MAJOREE + ' m², le prix se fixe après le diagnostic.' : '<strong>Prix à fixer</strong> dans la grille de la direction.';
+  return `<strong>${c.prix} € TTC par mois</strong>, ${c.fondateur ? 'tarif fondateurs' : 'tarif standard'}${c.supplement ? ', dont +' + MAJORATION_PCT + ' % pour un bassin de ' + SURFACE_STANDARD + ' à ' + SURFACE_MAJOREE + ' m²' : ''}`;
 }

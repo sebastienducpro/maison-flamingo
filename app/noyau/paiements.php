@@ -7,16 +7,21 @@
 // vérification de leur signature.
 // Rien ne part tant que l'identité de la société est incomplète ou que les accès GoCardless ne sont pas posés,
 // et l'accès se pose d'abord en bac à sable : on ne prélève pas de vrais clients avec un circuit jamais éprouvé.
+// Deux sociétés, deux créanciers : chacune a son compte GoCardless, sa numérotation de factures, et un client du pack
+// signe deux mandats, car un mandat SEPA n'appartient qu'à un seul créancier.
 
 declare(strict_types=1);
 
-const PAIEMENT_FICHIER = 'paiement-gocardless.json';
+const PAIEMENT_FICHIER = 'paiement-gocardless-%s.json';
 const GOCARDLESS_VERSION = '2015-07-06';
 const GOCARDLESS_POINTS = ['sandbox' => 'https://api-sandbox.gocardless.com', 'live' => 'https://api.gocardless.com'];
 
-function paiement_config(): ?array
+function paiement_config(string $soc): ?array
 {
-    $f = dossier_donnees() . '/' . PAIEMENT_FICHIER;
+    if (!isset(SOCIETES[$soc])) {
+        return null;
+    }
+    $f = dossier_donnees() . '/' . sprintf(PAIEMENT_FICHIER, $soc);
     if (!is_file($f)) {
         return null;
     }
@@ -52,36 +57,35 @@ function gocardless(array $c, string $methode, string $chemin, ?array $corps = n
     return $d;
 }
 
-function taux_tva(): ?float
+// Le taux de TVA de chaque société : vide en franchise, la mention de la société s'affiche alors.
+function taux_tva(string $soc): ?float
 {
-    $q = base()->prepare("SELECT valeur FROM parametres WHERE cle = 'facturation.taux_tva'");
-    $q->execute();
-    $v = trim((string) $q->fetchColumn());
+    $v = trim(parametre("facturation.$soc.taux_tva"));
     return $v === '' ? null : (float) str_replace(',', '.', $v);
 }
 
 /* ---------- Le mandat : posé par le client sur la page de GoCardless ---------- */
 
-function mandat_actif(int $client): ?array
+function mandat_actif(int $client, string $soc): ?array
 {
-    $q = base()->prepare("SELECT * FROM mandats WHERE client_id = ? AND statut = 'actif' ORDER BY id DESC LIMIT 1");
-    $q->execute([$client]);
+    $q = base()->prepare("SELECT * FROM mandats WHERE client_id = ? AND societe = ? AND statut = 'actif' ORDER BY id DESC LIMIT 1");
+    $q->execute([$client, $soc]);
     return $q->fetch() ?: null;
 }
 
-function ouvrir_mandat(array $c): string
+function ouvrir_mandat(array $c, string $soc): string
 {
-    $g = paiement_config();
+    $g = paiement_config($soc);
     if (!$g) {
         throw new RuntimeException('prélèvement non configuré');
     }
-    $br = gocardless($g, 'POST', '/billing_requests', ['billing_requests' => ['mandate_request' => ['scheme' => 'sepa_core'], 'metadata' => ['client' => (string) $c['id']]]], 'mandat-' . $c['id'] . '-' . date('YmdH'));
+    $br = gocardless($g, 'POST', '/billing_requests', ['billing_requests' => ['mandate_request' => ['scheme' => 'sepa_core'], 'metadata' => ['client' => (string) $c['id'], 'societe' => $soc]]], 'mandat-' . $soc . '-' . $c['id'] . '-' . date('YmdH'));
     $id = $br['billing_requests']['id'];
     $flux = gocardless($g, 'POST', '/billing_request_flows', ['billing_request_flows' => [
         'redirect_uri' => url_base() . '/espace.html#/contrat', 'exit_uri' => url_base() . '/espace.html#/contrat',
         'prefilled_customer' => array_filter(['given_name' => $c['prenom'], 'family_name' => $c['nom'], 'email' => $c['courriel']]),
         'links' => ['billing_request' => $id]]]);
-    base()->prepare("INSERT INTO mandats (client_id, demande, statut, cree_le, maj_le) VALUES (?,?, 'en_attente', ?,?)")->execute([$c['id'], $id, maintenant(), maintenant()]);
+    base()->prepare("INSERT INTO mandats (client_id, demande, statut, cree_le, maj_le, societe) VALUES (?,?, 'en_attente', ?,?,?)")->execute([$c['id'], $id, maintenant(), maintenant(), $soc]);
     return $flux['billing_request_flows']['authorisation_url'];
 }
 
@@ -89,16 +93,20 @@ function a_espace_mandat(): void
 {
     $c = exiger_client_connecte();
     exiger_post();
-    if (mandat_actif((int) $c['id'])) {
+    $soc = (string) (entree()['societe'] ?? '');
+    if (!isset(SOCIETES[$soc])) {
+        sortir(200, ['ok' => false, 'erreur' => 'societe']);
+    }
+    if (mandat_actif((int) $c['id'], $soc)) {
         sortir(200, ['ok' => false, 'erreur' => 'deja']);
     }
     try {
-        $url = ouvrir_mandat($c);
+        $url = ouvrir_mandat($c, $soc);
     } catch (Throwable $e) {
         tracer('client ' . $c['id'], 'mandat non ouvert', $e->getMessage());
         sortir(200, ['ok' => false, 'erreur' => 'indisponible']);
     }
-    tracer('client ' . $c['id'], 'mandat SEPA demandé');
+    tracer('client ' . $c['id'], 'mandat SEPA demandé', SOCIETES[$soc]);
     sortir(200, ['ok' => true, 'url' => $url]);
 }
 
@@ -117,12 +125,38 @@ function a_facturer(array $k, string $mois): ?int
     }
     // Payé à l'année : une seule facture, le mois du début puis chaque mois anniversaire ; le premier mois offert est déjà compté dedans.
     if (($k['modalite'] ?? 'mensuel') === 'annuel') {
-        return substr($k['debut'], 5, 2) === substr($mois, 5, 2) && substr($k['debut'], 0, 7) <= $mois ? (int) round((float) $k['montant_annuel'] * 100) : null;
+        if (substr($k['debut'], 5, 2) !== substr($mois, 5, 2) || substr($k['debut'], 0, 7) > $mois) {
+            return null;
+        }
+        // La première année est celle du contrat, mois offert compris ; les suivantes comptent douze mois, au prix du moment
+        // (une piscine dont la Maison a pris fin repasse au prix hors pack).
+        return substr($k['debut'], 0, 7) === $mois ? (int) round((float) $k['montant_annuel'] * 100)
+            : (int) round(round(prix_du_mois($k, $mois) * 12 * (1 - REMISE_ANNUELLE_PCT / 100)) * 100);
     }
     if ((int) $k['fondateur'] === 1 && substr($k['debut'], 0, 7) === $mois) {
         return null;
     }
-    return (int) round((float) $k['prix_mensuel'] * 100);
+    return (int) round(prix_du_mois($k, $mois) * 100);
+}
+
+// La piscine d'un pack garde sa remise tant que le contrat Maison court ; s'il prend fin, elle repasse à son prix
+// hors pack à l'échéance suivante de la piscine, comme le contrat le dit.
+function prix_du_mois(array $k, string $mois): float
+{
+    if ((float) ($k['remise_pack'] ?? 0) <= 0 || !$k['lien_contrat']) {
+        return (float) $k['prix_mensuel'];
+    }
+    $m = contrat_par_id((int) $k['lien_contrat']);
+    $fin = !$m ? $k['debut'] : ($m['statut'] === 'retracte' ? $m['debut'] : ($m['statut'] === 'resilie' ? $m['resiliation_effet'] : null));
+    if (!$fin) {
+        return (float) $k['prix_mensuel'];
+    }
+    // L'échéance de la piscine qui suit la fin de la Maison.
+    $e = $k['debut'];
+    do {
+        $e = date('Y-m-d', strtotime($e . ' +' . max(1, (int) $k['engagement_mois']) . ' months'));
+    } while ($e <= $fin);
+    return $mois . '-01' >= substr($e, 0, 7) . '-01' ? (float) $k['prix_hors_pack'] : (float) $k['prix_mensuel'];
 }
 
 function rendre_facture(array $s, array $c, array $k, array $f, ?float $tva): string
@@ -145,6 +179,9 @@ function rendre_facture(array $s, array $c, array $k, array $f, ?float $tva): st
     $h[] = $ht !== null
         ? '<p>Montant hors taxes : ' . $fmt($ht) . '<br>TVA à ' . esc(rtrim(rtrim(number_format($tva, 2, ',', ''), '0'), ',')) . ' % : ' . $fmt($ttc - $ht) . '<br><strong>Total TTC : ' . $fmt($ttc) . '</strong></p>'
         : '<p><strong>Total : ' . $fmt($ttc) . '</strong><br>' . esc($s['mention_tva']) . '</p>';
+    if (($k['societe'] ?? 'piscine') === 'maison' && trim($s['sap_numero'] ?? '') !== '') {
+        $h[] = '<p>Services à la personne, déclaration n° ' . esc($s['sap_numero']) . '. Selon la législation en vigueur, ces sommes ouvrent droit au crédit d\'impôt de l\'article 199 sexdecies du Code général des impôts ; une attestation fiscale annuelle est délivrée.</p>';
+    }
     $h[] = '<p>Réglée par prélèvement SEPA sur le mandat du client, à l\'échéance indiquée dans son espace.</p>';
     $h[] = '</main></body></html>';
     return implode("\n", $h);
@@ -162,16 +199,12 @@ function dossier_factures(): string
 // Prépare (sans rien émettre) ou émet les factures d'un mois. Une facture par contrat et par mois, jamais deux.
 function factures_du_mois(string $mois, bool $emettre, string $par): array
 {
-    $s = parametres_societe();
-    if (manques_societe($s)) {
-        return ['ok' => false, 'erreur' => 'societe'];
-    }
     $db = base();
     $q = $db->query("SELECT k.*, c.prenom, c.nom, c.adresse, c.commune, c.courriel FROM contrats k JOIN clients c ON c.id = k.client_id
         WHERE k.statut IN ('signe', 'resilie') ORDER BY k.numero");
     $lignes = [];
-    $tva = taux_tva();
     foreach ($q->fetchAll() as $k) {
+        $soc = $k['societe'] ?? 'piscine';
         $deja = $db->prepare('SELECT numero FROM factures WHERE contrat_id = ? AND periode = ?');
         $deja->execute([$k['id'], $mois]);
         $n = $deja->fetchColumn();
@@ -179,17 +212,21 @@ function factures_du_mois(string $mois, bool $emettre, string $par): array
         if ($montant === null) {
             continue;
         }
-        $ligne = ['contrat' => $k['numero'], 'client' => trim($k['prenom'] . ' ' . $k['nom']), 'montant' => $montant, 'facture' => $n ?: null, 'mandat' => (bool) mandat_actif((int) $k['client_id'])];
-        if ($emettre && !$n) {
+        $manques = manques_societe($soc);
+        $ligne = ['contrat' => $k['numero'], 'societe' => $soc, 'client' => trim($k['prenom'] . ' ' . $k['nom']), 'montant' => $montant, 'facture' => $n ?: null,
+            'mandat' => (bool) mandat_actif((int) $k['client_id'], $soc), 'societe_incomplete' => (bool) $manques];
+        // Refus par défaut : une société à l'identité incomplète n'émet rien, l'autre continue.
+        if ($emettre && !$n && !$manques) {
             $db->beginTransaction();
             $c = $db->prepare("SELECT COUNT(*) FROM factures WHERE numero LIKE ?");
             $annee = substr($mois, 0, 4);
-            $c->execute(["FM-$annee-%"]);
-            $f = ['numero' => sprintf('FM-%s-%06d', $annee, (int) $c->fetchColumn() + 1), 'periode' => $mois, 'montant' => $montant, 'emise_le' => date('Y-m-d')];
-            $html = rendre_facture($s, $k, $k, $f, $tva);
+            $prefixe = 'F' . PREFIXES[$soc];
+            $c->execute(["$prefixe-$annee-%"]);
+            $f = ['numero' => sprintf('%s-%s-%06d', $prefixe, $annee, (int) $c->fetchColumn() + 1), 'periode' => $mois, 'montant' => $montant, 'emise_le' => date('Y-m-d')];
+            $html = rendre_facture(parametres_societe($soc), $k, $k, $f, taux_tva($soc));
             file_put_contents(dossier_factures() . '/' . $f['numero'] . '.html', $html, LOCK_EX);
-            $db->prepare("INSERT INTO factures (client_id, contrat_id, numero, periode, montant, emise_le, fichier, empreinte, statut, cree_par) VALUES (?,?,?,?,?,?,?,?, 'emise', ?)")
-                ->execute([$k['client_id'], $k['id'], $f['numero'], $mois, $montant, $f['emise_le'], $f['numero'] . '.html', hash('sha256', $html), $par]);
+            $db->prepare("INSERT INTO factures (client_id, contrat_id, numero, periode, montant, emise_le, fichier, empreinte, statut, cree_par, societe) VALUES (?,?,?,?,?,?,?,?, 'emise', ?, ?)")
+                ->execute([$k['client_id'], $k['id'], $f['numero'], $mois, $montant, $f['emise_le'], $f['numero'] . '.html', hash('sha256', $html), $par, $soc]);
             $db->commit();
             $ligne['facture'] = $f['numero'];
         }
@@ -201,24 +238,32 @@ function factures_du_mois(string $mois, bool $emettre, string $par): array
 // Demande le prélèvement de chaque facture émise et pas encore prélevée, sur un mandat actif.
 function prelever_factures(string $mois): array
 {
-    $g = paiement_config();
-    if (!$g) {
-        return ['ok' => false, 'erreur' => 'non_configure'];
-    }
-    $q = base()->prepare("SELECT f.*, m.reference AS mandat FROM factures f JOIN mandats m ON m.client_id = f.client_id AND m.statut = 'actif'
-        WHERE f.periode = ? AND f.statut = 'emise' AND f.paiement IS NULL");
-    $q->execute([$mois]);
     $ok = 0;
     $echecs = [];
-    foreach ($q->fetchAll() as $f) {
-        try {
-            $p = gocardless($g, 'POST', '/payments', ['payments' => ['amount' => (int) $f['montant'], 'currency' => 'EUR', 'description' => 'Maison Flamingo ' . $f['numero'],
-                'metadata' => ['facture' => $f['numero']], 'links' => ['mandate' => $f['mandat']]]], 'facture-' . $f['numero']);
-            base()->prepare("UPDATE factures SET paiement = ?, statut = 'prelevement_demande', prelevement_le = ? WHERE id = ?")->execute([$p['payments']['id'], $p['payments']['charge_date'] ?? null, $f['id']]);
-            $ok++;
-        } catch (Throwable $e) {
-            $echecs[] = $f['numero'] . ' : ' . $e->getMessage();
+    $configurees = 0;
+    foreach (array_keys(SOCIETES) as $soc) {
+        $g = paiement_config($soc);
+        if (!$g) {
+            continue;
         }
+        $configurees++;
+        // Chaque facture se prélève sur le mandat de sa propre société, jamais sur celui de l'autre.
+        $q = base()->prepare("SELECT f.*, m.reference AS mandat FROM factures f JOIN mandats m ON m.client_id = f.client_id AND m.societe = f.societe AND m.statut = 'actif'
+            WHERE f.periode = ? AND f.societe = ? AND f.statut = 'emise' AND f.paiement IS NULL");
+        $q->execute([$mois, $soc]);
+        foreach ($q->fetchAll() as $f) {
+            try {
+                $p = gocardless($g, 'POST', '/payments', ['payments' => ['amount' => (int) $f['montant'], 'currency' => 'EUR', 'description' => 'Maison Flamingo ' . $f['numero'],
+                    'metadata' => ['facture' => $f['numero']], 'links' => ['mandate' => $f['mandat']]]], 'facture-' . $f['numero']);
+                base()->prepare("UPDATE factures SET paiement = ?, statut = 'prelevement_demande', prelevement_le = ? WHERE id = ?")->execute([$p['payments']['id'], $p['payments']['charge_date'] ?? null, $f['id']]);
+                $ok++;
+            } catch (Throwable $e) {
+                $echecs[] = $f['numero'] . ' : ' . $e->getMessage();
+            }
+        }
+    }
+    if (!$configurees) {
+        return ['ok' => false, 'erreur' => 'non_configure'];
     }
     tracer('systeme', 'prélèvements demandés', "$mois : $ok demandé(s)" . ($echecs ? ', ' . count($echecs) . ' échec(s)' : ''));
     return ['ok' => true, 'demandes' => $ok, 'echecs' => $echecs];
@@ -230,7 +275,8 @@ function prelever_factures(string $mois): array
 // Les notifications ne disent que « quelque chose a changé » : l'état se relit chez GoCardless, l'ordre des événements n'est pas garanti.
 function a_gocardless_webhook(): void
 {
-    $g = paiement_config();
+    // Chaque société déclare sa propre adresse de notification, avec son propre secret.
+    $g = paiement_config((string) ($_GET['societe'] ?? ''));
     $brut = (string) file_get_contents('php://input', false, null, 0, 1000000);
     $signature = (string) ($_SERVER['HTTP_WEBHOOK_SIGNATURE'] ?? '');
     if (!$g || $signature === '' || !hash_equals(hash_hmac('sha256', $brut, $g['secret_webhook']), $signature)) {
@@ -289,13 +335,15 @@ function a_facturation(): void
 {
     exiger_equipe(['superadmin']);
     $mois = preg_match('/^\d{4}-\d{2}$/', (string) ($_GET['mois'] ?? '')) ? $_GET['mois'] : date('Y-m');
-    $g = paiement_config();
-    $q = base()->prepare("SELECT f.numero, f.periode, f.montant, f.statut, f.emise_le, f.paye_le, f.rejet_motif, f.id, c.prenom, c.nom FROM factures f JOIN clients c ON c.id = f.client_id WHERE f.periode = ? ORDER BY f.numero");
+    $q = base()->prepare("SELECT f.numero, f.societe, f.periode, f.montant, f.statut, f.emise_le, f.paye_le, f.rejet_motif, f.id, c.prenom, c.nom FROM factures f JOIN clients c ON c.id = f.client_id WHERE f.periode = ? ORDER BY f.numero");
     $q->execute([$mois]);
-    $s = parametres_societe();
-    sortir(200, ['ok' => true, 'mois' => $mois, 'factures' => $q->fetchAll(), 'apercu' => factures_du_mois($mois, false, ''),
-        'configure' => (bool) $g, 'environnement' => $g['environnement'] ?? null, 'manques' => manques_societe($s), 'taux_tva' => taux_tva(),
-        'adresse_webhook' => url_base() . '/api.php?action=gocardless_webhook',
+    $societes = [];
+    foreach (SOCIETES as $soc => $nom) {
+        $g = paiement_config($soc);
+        $societes[$soc] = ['nom' => $nom, 'configure' => (bool) $g, 'environnement' => $g['environnement'] ?? null, 'manques' => manques_societe($soc), 'taux_tva' => taux_tva($soc),
+            'adresse_webhook' => url_base() . '/api.php?action=gocardless_webhook&societe=' . $soc];
+    }
+    sortir(200, ['ok' => true, 'mois' => $mois, 'factures' => $q->fetchAll(), 'apercu' => factures_du_mois($mois, false, ''), 'societes' => $societes,
         'automatique' => base()->query("SELECT valeur FROM parametres WHERE cle = 'facturation.automatique'")->fetchColumn() === '1']);
 }
 
@@ -304,6 +352,10 @@ function a_facturation_configurer(): void
     $u = exiger_equipe(['superadmin']);
     exiger_post();
     $d = entree();
+    $soc = (string) ($d['societe'] ?? '');
+    if (!isset(SOCIETES[$soc])) {
+        sortir(200, ['ok' => false, 'erreur' => 'societe']);
+    }
     $env = (string) ($d['environnement'] ?? '');
     $jeton = texte($d['jeton'] ?? '', 200);
     $secret = texte($d['secret_webhook'] ?? '', 200);
@@ -319,13 +371,12 @@ function a_facturation_configurer(): void
     if ($point !== '' && preg_match('#^http://(localhost|127\.0\.0\.1)(:\d+)?$#', $point)) {
         $v['point'] = $point;
     }
-    $f = dossier_donnees() . '/' . PAIEMENT_FICHIER;
+    $f = dossier_donnees() . '/' . sprintf(PAIEMENT_FICHIER, $soc);
     file_put_contents($f, json_encode($v), LOCK_EX);
     @chmod($f, 0600);
     $taux = trim((string) ($d['taux_tva'] ?? ''));
-    base()->prepare("INSERT INTO parametres (cle, valeur, maj_le, maj_par) VALUES ('facturation.taux_tva', ?, ?, ?) ON CONFLICT(cle) DO UPDATE SET valeur = excluded.valeur, maj_le = excluded.maj_le, maj_par = excluded.maj_par")
-        ->execute([preg_match('/^\d{1,2}([.,]\d{1,2})?$/', $taux) ? $taux : '', maintenant(), $u['courriel']]);
-    tracer($u, 'prélèvement configuré', $env);
+    poser_parametre("facturation.$soc.taux_tva", preg_match('/^\d{1,2}([.,]\d{1,2})?$/', $taux) ? $taux : '', $u['courriel']);
+    tracer($u, 'prélèvement configuré', SOCIETES[$soc] . ', ' . $env);
     sortir(200, ['ok' => true]);
 }
 
@@ -371,11 +422,18 @@ function a_facture_document(): void
 function a_espace_factures(): void
 {
     $c = exiger_client_connecte();
-    $q = base()->prepare("SELECT id, numero, periode, montant, statut, emise_le, paye_le FROM factures WHERE client_id = ? ORDER BY id DESC");
+    $q = base()->prepare("SELECT id, numero, societe, periode, montant, statut, emise_le, paye_le FROM factures WHERE client_id = ? ORDER BY id DESC");
     $q->execute([$c['id']]);
-    $m = base()->prepare('SELECT statut FROM mandats WHERE client_id = ? ORDER BY id DESC LIMIT 1');
-    $m->execute([$c['id']]);
-    sortir(200, ['ok' => true, 'factures' => $q->fetchAll(), 'mandat' => $m->fetchColumn() ?: null, 'prelevement_possible' => (bool) paiement_config()]);
+    // Un mandat par société dont le client a un contrat signé : le pack en demande deux.
+    $k = base()->prepare("SELECT DISTINCT societe FROM contrats WHERE client_id = ? AND statut = 'signe'");
+    $k->execute([$c['id']]);
+    $m = base()->prepare('SELECT statut FROM mandats WHERE client_id = ? AND societe = ? ORDER BY id DESC LIMIT 1');
+    $mandats = [];
+    foreach ($k->fetchAll(PDO::FETCH_COLUMN) as $soc) {
+        $m->execute([$c['id'], $soc]);
+        $mandats[] = ['societe' => $soc, 'nom' => SOCIETES[$soc] ?? $soc, 'statut' => $m->fetchColumn() ?: null, 'possible' => (bool) paiement_config($soc)];
+    }
+    sortir(200, ['ok' => true, 'factures' => $q->fetchAll(), 'mandats' => $mandats]);
 }
 
 // Le 1er du mois, si la direction l'a décidé : les factures du mois partent seules, puis leurs prélèvements.
@@ -400,7 +458,7 @@ function a_facturation_automatique(): void
     $u = exiger_equipe(['superadmin']);
     exiger_post();
     $oui = !empty(entree()['actif']) ? '1' : '0';
-    if ($oui === '1' && !paiement_config()) {
+    if ($oui === '1' && !paiement_config('piscine') && !paiement_config('maison')) {
         sortir(200, ['ok' => false, 'erreur' => 'non_configure']);
     }
     base()->prepare("INSERT INTO parametres (cle, valeur, maj_le, maj_par) VALUES ('facturation.automatique', ?, ?, ?) ON CONFLICT(cle) DO UPDATE SET valeur = excluded.valeur, maj_le = excluded.maj_le, maj_par = excluded.maj_par")

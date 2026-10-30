@@ -11,7 +11,7 @@ date_default_timezone_set('Europe/Paris');
 // Un avertissement glissé dans une réponse casse le JSON et peut montrer un chemin du serveur.
 ini_set('display_errors', '0');
 
-const VERSION_SCHEMA = 12;
+const VERSION_SCHEMA = 13;
 const TAILLE_PHOTO_MAX = 4000000;
 const PHOTOS_MAX = 6;
 const EXPEDITEUR = 'contact@maisonflamingo.fr';
@@ -40,9 +40,20 @@ const DUREE_INVITATION = 604800;
 const DUREE_DEFAUT = ['passage' => 30, 'diagnostic' => 60];
 // Avant trois passages mesurés, la durée se devine selon la formule : une maison fermée seule se visite plus vite
 // qu'une piscine, une maison avec piscine plus lentement. Dès que l'horloge a parlé, elle a raison.
-const DUREE_FORMULE = ['Piscine' => 30, 'Maison fermée' => 20, 'Piscine + Maison fermée' => 40];
-// Une maison fermée seule se visite une fois par mois : chaque semaine, elle ne pèse qu'un quart de sa visite.
-const PART_HEBDO_FORMULE = ['Maison fermée' => 0.25];
+// Les formules, une seule fois : la société qui les porte, leur engagement, leur prix par défaut (modifiable dans la grille
+// de l'écran Société), et ce qu'elles pèsent dans une tournée. Le libellé est celui de la fiche client.
+// Deux sociétés sous la même marque : la piscine n'ouvre droit à aucun crédit d'impôt, la Maison relève des services à la
+// personne, qui exigent une activité exclusive. Une piscine ne se facture jamais par la société Maison.
+const FORMULES = [
+    'Piscine' => ['cle' => 'piscine', 'societe' => 'piscine', 'engagement' => 12, 'piscine' => true, 'prix' => 179, 'fondateur' => 149, 'duree' => 30, 'part' => 1],
+    'Piscine équipée, quinzaine hors été' => ['cle' => 'quinzaine', 'societe' => 'piscine', 'engagement' => 12, 'piscine' => true, 'prix' => null, 'fondateur' => null, 'duree' => 30, 'part' => 1],
+    'Maison' => ['cle' => 'maison', 'societe' => 'maison', 'engagement' => 0, 'piscine' => false, 'prix' => 45, 'fondateur' => 45, 'duree' => 60, 'part' => 0.25],
+    'Maison renforcée' => ['cle' => 'maison_renforcee', 'societe' => 'maison', 'engagement' => 0, 'piscine' => false, 'prix' => 100, 'fondateur' => 100, 'duree' => 120, 'part' => 0.25],
+    'Veille de résidence' => ['cle' => 'veille', 'societe' => 'maison', 'engagement' => 0, 'piscine' => false, 'prix' => 49, 'fondateur' => 49, 'duree' => 20, 'part' => 0.25],
+    // Le pack : deux contrats, deux sociétés ; la remise porte sur la ligne piscine, jamais sur la Maison éligible au crédit d'impôt.
+    'Piscine + Maison' => ['cle' => 'pack', 'pack' => ['Piscine', 'Maison'], 'duree' => 45, 'part' => 1],
+];
+const REMISE_PACK = 12;
 // L'équilibre d'une journée, en minutes, trajets compris : ni casser les gens, ni payer des journées creuses.
 const JOURNEE_CIBLE_MIN = 420;   // sept heures
 const JOURNEE_MAX_MIN = 450;     // sept heures et demie, jamais au-delà
@@ -336,6 +347,28 @@ function migrer(PDO $db): void
         'sur_devis' => 'INTEGER NOT NULL DEFAULT 0', 'modalite' => "TEXT NOT NULL DEFAULT 'mensuel'", 'mois_payants' => 'INTEGER', 'montant_annuel' => 'REAL',
         'indice_travail_ref' => 'TEXT', 'indice_travail_periode' => 'TEXT', 'indice_produits_ref' => 'TEXT', 'indice_produits_periode' => 'TEXT'] as $col => $def) {
         ajouter_colonne($db, 'contrats', $col, $def);
+    }
+    // Version 13 : les nouvelles formules et les deux sociétés. Les anciens libellés sont renommés ; l'identité saisie
+    // jusqu'ici devient celle de la société Piscine, et la relecture et les indices deviennent communs aux deux.
+    ajouter_colonne($db, 'contrats', 'societe', "TEXT NOT NULL DEFAULT 'piscine'");
+    ajouter_colonne($db, 'contrats', 'lien_contrat', 'INTEGER');
+    ajouter_colonne($db, 'contrats', 'prix_hors_pack', 'REAL');
+    ajouter_colonne($db, 'contrats', 'remise_pack', 'REAL NOT NULL DEFAULT 0');
+    ajouter_colonne($db, 'mandats', 'societe', "TEXT NOT NULL DEFAULT 'piscine'");
+    ajouter_colonne($db, 'factures', 'societe', "TEXT NOT NULL DEFAULT 'piscine'");
+    $db->exec("UPDATE clients SET formule = 'Veille de résidence' WHERE formule = 'Maison fermée'");
+    $db->exec("UPDATE clients SET formule = 'Piscine + Maison' WHERE formule = 'Piscine + Maison fermée'");
+    foreach (['raison_sociale', 'forme', 'siret', 'rcs', 'adresse', 'courriel', 'telephone', 'mention_tva', 'mediateur_nom', 'mediateur_site', 'assureur', 'police'] as $k) {
+        $db->prepare("INSERT OR IGNORE INTO parametres (cle, valeur, maj_le, maj_par) SELECT 'societe.piscine.' || ?, valeur, maj_le, maj_par FROM parametres WHERE cle = 'societe.' || ?")->execute([$k, $k]);
+    }
+    foreach (['juriste_nom', 'juriste_le', 'indice_travail_nom', 'indice_travail_valeur', 'indice_travail_periode', 'indice_produits_nom', 'indice_produits_valeur', 'indice_produits_periode'] as $k) {
+        $db->prepare("INSERT OR IGNORE INTO parametres (cle, valeur, maj_le, maj_par) SELECT 'contrats.' || ?, valeur, maj_le, maj_par FROM parametres WHERE cle = 'societe.' || ?")->execute([$k, $k]);
+    }
+    $db->exec("INSERT OR IGNORE INTO parametres (cle, valeur, maj_le, maj_par) SELECT 'facturation.piscine.taux_tva', valeur, maj_le, maj_par FROM parametres WHERE cle = 'facturation.taux_tva'");
+    // L'accès GoCardless posé avant la v13 était celui de la seule société : il devient celui de la société Piscine.
+    $ancien = dossier_donnees() . '/paiement-gocardless.json';
+    if (is_file($ancien) && !is_file(dossier_donnees() . '/paiement-gocardless-piscine.json')) {
+        @rename($ancien, dossier_donnees() . '/paiement-gocardless-piscine.json');
     }
     $version = (int) $db->query('PRAGMA user_version')->fetchColumn();
     $db->beginTransaction();

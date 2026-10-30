@@ -302,7 +302,7 @@ function a_carnet_saison(): void
     $mois = (int) date('n');
     $prochaine = fn (int $m, int $j) => sprintf('%04d-%02d-%02d', $annee + ($mois > $m ? 1 : 0), $m, $j);
     $piscine = str_contains(mb_strtolower($c['formule']), 'piscine');
-    $maison = str_contains(mb_strtolower($c['formule']), 'maison');
+    $maison = str_contains(mb_strtolower($c['formule']), 'maison') || str_contains(mb_strtolower($c['formule']), 'résidence');
     $modeles = [];
     if ($piscine) {
         $modeles[] = ['titre' => 'Hivernage de la piscine', 'quand' => $prochaine(11, 25), 'detail' => 'Le flamant rentre, la bâche se pose. L\'eau est équilibrée pour l\'hiver.'];

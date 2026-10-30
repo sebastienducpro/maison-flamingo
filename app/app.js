@@ -142,7 +142,16 @@ async function demarrer() {
   if (!APP.utilisateur) return vueConnexion();
   viderFile();
   majAFaire();
+  chargerGrille();
   route();
+}
+
+// La grille de la direction, gardée sur l'appareil pour les diagnostics faits sans réseau.
+async function chargerGrille() {
+  const d = await api('grille').catch(() => null);
+  if (!d || !d.ok) return;
+  appliquerGrille(d.grille);
+  try { localStorage.setItem('flamingo_grille', JSON.stringify(d.grille)); } catch (e) {}
 }
 
 // Chaque rôle a son point de départ : la tournée pour qui est sur le terrain, le tableau pour qui pilote.
@@ -447,7 +456,7 @@ async function vueClient(id) {
         <div class="deux">
           <label>Statut<select name="statut">${Object.entries(STATUTS).map(([k, l]) => `<option value="${k}"${k === c.statut ? ' selected' : ''}>${l}</option>`).join('')}</select>
             <span class="aide" id="aide-statut">${AIDE_STATUT[c.statut] || ''}${c.statut_depuis ? ' Depuis le ' + echapper(dateFr(c.statut_depuis, false)) + '.' : ''}</span></label>
-          <label>Formule<select name="formule">${['', 'Piscine', 'Piscine + Maison fermée', 'Maison fermée'].map((f) => `<option${f === c.formule ? ' selected' : ''} value="${f}">${f || '–'}</option>`).join('')}</select></label>
+          <label>Formule<select name="formule">${['', ...Object.values(TARIFS).map((t) => t.libelle)].map((f) => `<option${f === c.formule ? ' selected' : ''} value="${echapper(f)}">${echapper(f) || '–'}</option>`).join('')}</select></label>
         </div>
         <label id="motif-statut"${['veille', 'desinscrit', 'perdu'].includes(c.statut) ? '' : ' hidden'}>Motif <span class="aide">absence, travaux, impayé, déménagement, concurrent, prix…</span><input name="statut_motif" value="${echapper(c.statut_motif || '')}"></label>
         <div class="deux">
@@ -594,9 +603,10 @@ function champHtml(ch, etat) {
         <button type="button" class="secondaire" data-suggerer>Proposer à partir des relevés</button></div>`;
     case 'proposition': {
       const p = etat.proposition;
-      const calcul = prixPropose(p.formule, v);
+      const calcul = prixPropose(p.formule, v, p.fondateur !== false);
       return `<div class="champ"><div class="puces" data-formule>${Object.entries(TARIFS).map(([k, t]) => `<button type="button" class="puce${p.formule === k ? ' choisie' : ''}" data-valeur="${k}">${t.libelle}</button>`).join('')}<button type="button" class="puce${p.formule === 'aucune' ? ' choisie' : ''}" data-valeur="aucune">Hors formule</button></div>
-        <p class="calcule" data-prix>${calcul ? `<strong>${calcul.prix} € TTC par mois</strong>, tarif fondateurs${calcul.supplement ? ', dont ' + SUPPLEMENT_GRAND_BASSIN + ' € pour un bassin de plus de ' + SURFACE_STANDARD + ' m²' : ''}` : ''}</p>
+        <label class="case"><input type="checkbox" data-fondateur${p.fondateur !== false ? ' checked' : ''}> Tarif fondateurs</label>
+        <p class="calcule" data-prix>${textePrixPropose(calcul)}</p>
         <label>Un mot pour le client<textarea rows="2" data-proposition-note>${echapper(p.note || '')}</textarea></label></div>`;
     }
     default:
@@ -714,7 +724,7 @@ async function vueVisite(idClient, type) {
     const zv = form.querySelector('[data-volume]');
     if (zv) { const vol = volumeBassin(etat.valeurs); zv.innerHTML = `Volume estimé : <strong>${vol === null ? '–' : vol + ' m³'}</strong>`; }
     const zp = form.querySelector('[data-prix]');
-    if (zp) { const c = prixPropose(etat.proposition.formule, etat.valeurs); zp.innerHTML = c ? `<strong>${c.prix} € TTC par mois</strong>, tarif fondateurs${c.supplement ? ', dont ' + SUPPLEMENT_GRAND_BASSIN + ' € pour un bassin de plus de ' + SURFACE_STANDARD + ' m²' : ''}` : ''; }
+    if (zp) zp.innerHTML = textePrixPropose(prixPropose(etat.proposition.formule, etat.valeurs, etat.proposition.fondateur !== false));
   };
 
   form.addEventListener('input', (ev) => {
@@ -724,6 +734,7 @@ async function vueVisite(idClient, type) {
     else if (t.dataset.etatNote) { etat.etats[t.dataset.etatNote] = etat.etats[t.dataset.etatNote] || {}; etat.etats[t.dataset.etatNote].note = t.value; }
     else if (t.dataset.constat !== undefined) etat.constats[+t.dataset.constat].texte = t.value;
     else if (t.hasAttribute('data-proposition-note')) etat.proposition.note = t.value;
+    else if (t.hasAttribute('data-fondateur')) etat.proposition.fondateur = t.checked;
     else if (t.dataset.legende !== undefined) photos[+t.dataset.legende].legende = t.value;
     else if (t.dataset.fin) etat[t.dataset.fin] = t.value;
     rafraichirCalculs();
@@ -801,8 +812,10 @@ async function vueVisite(idClient, type) {
     const identifiant = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2));
     const contenu = { valeurs: etat.valeurs, etats: etat.etats, constats: etat.constats.filter((c) => c.texte.trim()), proposition: etat.proposition, interne: etat.interne };
     if (type === 'diagnostic') {
-      const calcul = prixPropose(etat.proposition.formule, etat.valeurs);
-      contenu.proposition = { ...etat.proposition, prix: calcul ? calcul.prix : null, supplement: calcul ? calcul.supplement : false };
+      const calcul = prixPropose(etat.proposition.formule, etat.valeurs, etat.proposition.fondateur !== false);
+      const t = TARIFS[etat.proposition.formule];
+      // Le libellé et le prix sont figés dans la visite : le rapport dira ce qui a été proposé ce jour-là, même si la grille change.
+      contenu.proposition = { ...etat.proposition, libelle: t ? t.libelle : '', prix: calcul ? calcul.prix : null, raison: calcul ? calcul.raison || '' : '', supplement: calcul ? !!calcul.supplement : false, fondateur: etat.proposition.fondateur !== false };
       contenu.volume = volumeBassin(etat.valeurs);
     }
     const envoi = {

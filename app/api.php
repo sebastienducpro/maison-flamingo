@@ -46,7 +46,7 @@ const ACTIONS = [
     'vivier', 'vivier_enregistrer', 'vivier_activer', 'vivier_terminer',
     'fiche', 'fiche_enregistrer', 'qualification_enregistrer', 'qualification_supprimer', 'conges', 'conge_demander', 'conge_annuler', 'conge_decider',
     'releve_essai', 'releve_preference', 'avis_noter',
-    'societe', 'societe_enregistrer', 'contrats', 'contrat_tarif', 'contrat_preparer', 'contrat_annuler', 'contrat_document', 'contrat_rappel_noter',
+    'societe', 'societe_enregistrer', 'grille', 'grille_enregistrer', 'contrats', 'contrat_tarif', 'contrat_preparer', 'contrat_annuler', 'contrat_document', 'contrat_rappel_noter',
     'espace_contrat', 'espace_contrat_signer', 'espace_contrat_retracter', 'espace_resilier',
     'espace_mandat', 'espace_factures', 'gocardless_webhook', 'facturation', 'facturation_configurer', 'facturation_emettre', 'facturation_automatique', 'facture_document',
 ];

@@ -49,7 +49,7 @@ function estimer_durees(array $ids, string $type = 'passage', array $formules = 
 {
     $sortie = [];
     foreach ($ids as $id) {
-        $sortie[$id] = ($type === 'passage' ? DUREE_FORMULE[$formules[$id] ?? ''] ?? null : null) ?? DUREE_DEFAUT[$type] ?? 30;
+        $sortie[$id] = ($type === 'passage' ? FORMULES[$formules[$id] ?? '']['duree'] ?? null : null) ?? DUREE_DEFAUT[$type] ?? 30;
     }
     if (!$ids) {
         return $sortie;
@@ -289,7 +289,7 @@ function charge_journee(array $arrets, int $trajet_min): array
     $min = $trajet_min;
     $piscines = 0;
     foreach ($arrets as $a) {
-        $min += $a['duree'] * (PART_HEBDO_FORMULE[$a['formule']] ?? 1);
+        $min += $a['duree'] * (FORMULES[$a['formule']]['part'] ?? 1);
         $piscines += str_contains($a['formule'], 'Piscine') || $a['formule'] === '' ? 1 : 0;
     }
     $min = (int) round($min);

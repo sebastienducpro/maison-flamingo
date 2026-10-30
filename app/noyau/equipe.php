@@ -484,7 +484,8 @@ function a_client_enregistrer(): void
     if (in_array($u['role'], ['chef', 'superadmin'], true)) {
         $c['statut'] = in_array($d['statut'] ?? '', STATUTS_CLIENT, true) ? $d['statut'] : ($avant['statut'] ?? 'prospect');
         $c['statut_motif'] = texte($d['statut_motif'] ?? ($avant['statut_motif'] ?? ''), 200);
-        $c['formule'] = texte($d['formule'] ?? '', 40);
+        // Une formule hors du catalogue ne s'enregistre pas : elle n'aurait ni durée de passage ni prix.
+        $c['formule'] = isset(FORMULES[$d['formule'] ?? '']) || ($d['formule'] ?? '') === '' ? (string) ($d['formule'] ?? '') : ($avant['formule'] ?? '');
         $c['technicien_id'] = technicien_valable(entier($d['technicien_id'] ?? 0), $agence);
         $jour = entier($d['jour_passage'] ?? 0);
         $c['jour_passage'] = ($jour >= 1 && $jour <= 7) ? $jour : null;

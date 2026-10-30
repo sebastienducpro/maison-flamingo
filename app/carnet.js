@@ -78,7 +78,7 @@ async function vueCarnet(id) {
   });
   document.getElementById('saison').addEventListener('click', async () => {
     const r = await api('carnet_saison', { methode: 'POST', corps: { id: c.id } });
-    if (r.ok) vueCarnet(c.id); else alert('La saison type dépend de la formule du client : renseignez-la dans la fiche (Piscine, Maison fermée…).');
+    if (r.ok) vueCarnet(c.id); else alert('La saison type dépend de la formule du client : renseignez-la dans la fiche (Piscine, Maison, Veille de résidence…).');
   });
   document.getElementById('f-ev').addEventListener('submit', async (ev) => {
     ev.preventDefault();

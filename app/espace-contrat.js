@@ -9,18 +9,29 @@ async function vueContratClient(message = '') {
   zone().innerHTML = '<p class="attente">Chargement…</p>';
   const d = await appel('espace_contrat');
   if (!d.ok) return vueConnexionClient();
-  const carte = (k) => `
+  // Les deux contrats d'un pack se signent ensemble : le formulaire n'apparaît qu'une fois, sous le premier.
+  const parId = Object.fromEntries(d.contrats.map((k) => [k.id, k]));
+  const jumeau = (k) => (k.lien_contrat && parId[k.lien_contrat] && parId[k.lien_contrat].statut === 'a_signer' ? parId[k.lien_contrat] : null);
+  const signeAvec = new Set();
+  const carte = (k) => {
+    const j = k.statut === 'a_signer' ? jumeau(k) : null;
+    const formulaire = k.statut === 'a_signer' && !signeAvec.has(k.id);
+    if (j) signeAvec.add(j.id);
+    return `
     <section class="carte-espace" data-id="${k.id}">
-      <p class="surtitre">Contrat ${echapper(k.numero)} · ${MOTS_CONTRAT[k.statut] || ''}</p>
+      <p class="surtitre">Contrat ${echapper(k.numero)} · ${echapper(k.societe_nom)} · ${MOTS_CONTRAT[k.statut] || ''}</p>
       <h2>${echapper(k.formule)} · ${k.modalite === 'annuel' ? Number(k.montant_annuel).toLocaleString('fr-FR') + ' € TTC par an, payés d\'avance' : Number(k.prix_mensuel).toLocaleString('fr-FR', { minimumFractionDigits: 2 }) + ' € TTC par mois'}</h2>
       <p>Début le ${echapper(jourFr(k.debut))}${k.engagement_mois ? `, pour une saison de ${k.engagement_mois} mois reconduite avec rappel écrit` : ', sans engagement'}${k.fondateur ? ' · offre fondateur' : ''}.</p>
-      <p><a class="bouton" href="api.php?action=contrat_document&id=${k.id}" target="_blank" rel="noopener">Lire le contrat complet</a></p>
-      ${k.statut === 'a_signer' ? `
+      ${k.remise_pack ? `<p class="aide">Prix remisé de ${Number(k.remise_pack).toLocaleString('fr-FR')} € par mois tant que votre contrat Maison court ; s'il prend fin, ce contrat repasse à ${Number(k.prix_hors_pack).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} € à son échéance suivante.</p>` : ''}
+      <p><a class="bouton" href="api.php?action=contrat_document&id=${k.id}" target="_blank" rel="noopener">Lire le contrat complet</a>${j ? ` <a class="bouton" href="api.php?action=contrat_document&id=${j.id}" target="_blank" rel="noopener">Lire le contrat ${echapper(j.numero)}</a>` : ''}</p>
+      ${k.statut === 'a_signer' && !formulaire ? '<p class="aide">Ce contrat se signe avec l\'autre contrat de votre formule, ci-dessus.</p>' : ''}
+      ${formulaire ? `
+      ${j ? `<p>Votre formule réunit deux contrats, l'un avec la ${echapper(k.societe_nom)}, l'autre avec la ${echapper(j.societe_nom)}. Ils se signent ensemble.</p>` : ''}
       <form class="signer">
-        <label class="case-client"><input type="checkbox" name="lu" required> J'ai lu le contrat complet, ses conditions et le formulaire de rétractation.</label>
+        <label class="case-client"><input type="checkbox" name="lu" required> J'ai lu ${j ? 'les deux contrats complets, leurs' : 'le contrat complet, ses'} conditions et le formulaire de rétractation.</label>
         <label class="case-client"><input type="checkbox" name="execution_anticipee"> Je demande que le service commence avant la fin de mon délai de rétractation de ${d.retractation_jours} jours. Si je me rétracte ensuite, je paie la part du service déjà faite.</label>
         <label>Pour signer, tapez vos prénom et nom<input name="nom" autocomplete="name" required></label>
-        <button>Signer le contrat</button>
+        <button>${j ? 'Signer les deux contrats' : 'Signer le contrat'}</button>
         <p class="message" role="status"></p>
       </form>` : ''}
       ${k.statut === 'signe' ? `<p class="aide">Signé le ${echapper(dateFr(k.signe_le))} par ${echapper(k.signe_nom)}.${k.peut_se_retracter ? ` Vous pouvez vous rétracter jusqu'au ${echapper(jourFr(k.retractation_jusquau))}, sans motif ni frais.` : ''}</p>
@@ -37,6 +48,7 @@ async function vueContratClient(message = '') {
       ${k.statut === 'resilie' ? `<p class="aide">Résiliation reçue le ${echapper(dateFr(k.resilie_le))}, effective le ${echapper(jourFr(k.resiliation_effet))}.</p>` : ''}
       ${k.statut === 'retracte' ? `<p class="aide">Rétractation reçue le ${echapper(dateFr(k.resilie_le))}.</p>` : ''}
     </section>`;
+  };
   zone().innerHTML = `
     <section class="tete-carnet courte"><p class="surtitre">Mon contrat</p><h1>Votre abonnement, noir sur blanc.</h1></section>
     ${message ? `<p class="verdict ok">${message}</p>` : ''}
@@ -52,7 +64,7 @@ async function vueContratClient(message = '') {
     if (signer) signer.addEventListener('submit', async (e) => {
       e.preventDefault();
       const r = await appel('espace_contrat_signer', { methode: 'POST', corps: { id, lu: signer.lu.checked, execution_anticipee: signer.execution_anticipee.checked, nom: signer.nom.value } });
-      if (r.ok) return vueContratClient('Contrat signé. Il reste disponible ici, et nous en sommes prévenus.');
+      if (r.ok) return vueContratClient((r.signes && r.signes.length > 1 ? 'Contrats signés. Ils restent' : 'Contrat signé. Il reste') + ' disponibles ici, et nous en sommes prévenus.');
       signer.querySelector('.message').textContent = r.erreur === 'champs' ? 'Cochez la première case et tapez votre nom tel qu\'il figure au contrat' + (r.attendu ? ' : ' + r.attendu : '') + '.' : 'La signature n\'a pas abouti. Appelez-nous.';
     });
     const retracter = s.querySelector('[data-retracter]');
@@ -68,7 +80,7 @@ async function vueContratClient(message = '') {
       e.preventDefault();
       const r = await appel('espace_resilier', { methode: 'POST', corps: { id, motif: resilier.motif.value } });
       // L'accusé de réception s'affiche tout de suite, avec la date et l'heure de la demande et la date d'effet.
-      if (r.ok) return vueContratClient(`Votre demande de résiliation est bien reçue, le ${dateFr(r.recu_le)}. Elle prend effet le ${jourFr(r.effet)}. Gardez cette page : elle vaut accusé de réception.`);
+      if (r.ok) return vueContratClient(`Votre demande de résiliation est bien reçue, le ${dateFr(r.recu_le)}. Elle prend effet le ${jourFr(r.effet)}.${r.fin_remise ? ` Votre contrat piscine continue ; à son échéance du ${jourFr(r.fin_remise)}, il repasse à son prix hors pack de ${Number(r.prix_hors_pack).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} € par mois.` : ''} Gardez cette page : elle vaut accusé de réception.`);
       resilier.querySelector('.message').textContent = 'La résiliation n\'a pas abouti. Écrivez-nous ou appelez-nous.';
     });
   });
@@ -80,20 +92,21 @@ async function facturesClient() {
   const z = document.getElementById('factures-client');
   if (!d.ok || !z) return;
   const MOTS = { emise: 'émise', prelevement_demande: 'prélèvement en cours', payee: 'payée', rejetee: 'prélèvement rejeté', annulee: 'annulée' };
+  // Un mandat par société : un mandat SEPA n'autorise qu'un seul créancier, le client d'un pack en signe deux.
+  const plusieurs = d.mandats.length > 1;
   z.innerHTML = `
-    ${d.prelevement_possible && d.mandat !== 'actif' ? `<section class="carte-espace"><h2>Le prélèvement mensuel</h2>
-      <p>${d.mandat === 'en_attente' ? 'Votre autorisation de prélèvement est en cours de validation.' : 'Votre abonnement se règle par prélèvement SEPA. Vous saisissez votre IBAN sur la page sécurisée de GoCardless, notre prestataire de paiement : il ne passe jamais par Maison Flamingo.'}</p>
-      ${d.mandat === 'en_attente' ? '' : '<button id="mandat">Mettre en place le prélèvement</button><p class="message" id="m-mandat" role="status"></p>'}</section>` : ''}
-    ${d.mandat === 'actif' ? '<p class="aide">Prélèvement SEPA en place.</p>' : ''}
+    ${d.mandats.filter((m) => m.possible && m.statut !== 'actif').map((m) => `<section class="carte-espace"><h2>Le prélèvement${plusieurs ? ' · ' + echapper(m.nom) : ' mensuel'}</h2>
+      <p>${m.statut === 'en_attente' ? 'Votre autorisation de prélèvement est en cours de validation.' : 'Votre abonnement se règle par prélèvement SEPA. Vous saisissez votre IBAN sur la page sécurisée de GoCardless, notre prestataire de paiement : il ne passe jamais par Maison Flamingo.' + (plusieurs ? ' Vos deux contrats relèvent de deux sociétés : chacune vous demande sa propre autorisation.' : '')}</p>
+      ${m.statut === 'en_attente' ? '' : `<button data-mandat="${m.societe}">Mettre en place le prélèvement</button><p class="message" role="status"></p>`}</section>`).join('')}
+    ${d.mandats.filter((m) => m.statut === 'actif').map((m) => `<p class="aide">Prélèvement SEPA en place${plusieurs ? ' pour la ' + echapper(m.nom) : ''}.</p>`).join('')}
     ${d.factures.length ? `<h2 class="intertitre">Mes factures</h2><ul class="postes-client">${d.factures.map((f) => `<li><div><a href="api.php?action=facture_document&id=${f.id}" target="_blank" rel="noopener"><strong>${echapper(f.numero)}</strong></a><span>${(f.montant / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} € · ${echapper(MOTS[f.statut] || f.statut)}</span></div></li>`).join('')}</ul>` : ''}`;
-  const b = document.getElementById('mandat');
-  if (b) b.addEventListener('click', async () => {
+  z.querySelectorAll('[data-mandat]').forEach((b) => b.addEventListener('click', async () => {
     b.disabled = true;
-    const r = await appel('espace_mandat', { methode: 'POST', corps: {} });
+    const r = await appel('espace_mandat', { methode: 'POST', corps: { societe: b.dataset.mandat } });
     if (r.ok && /^https:\/\//.test(r.url)) { location.href = r.url; return; }
-    document.getElementById('m-mandat').textContent = 'La page de prélèvement n\'est pas disponible pour l\'instant. Réessayez plus tard ou appelez-nous.';
+    b.nextElementSibling.textContent = 'La page de prélèvement n\'est pas disponible pour l\'instant. Réessayez plus tard ou appelez-nous.';
     b.disabled = false;
-  });
+  }));
 }
 
 // Sur l'accueil : un contrat à signer s'annonce en tête, sans masquer le carnet.

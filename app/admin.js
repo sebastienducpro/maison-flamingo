@@ -471,7 +471,7 @@ async function vueLeads(tous = false) {
       <h2>Lead reçu par téléphone</h2>
       <div class="deux"><label>Prénom<input name="prenom" required></label><label>Nom<input name="nom"></label></div>
       <div class="deux"><label>Téléphone<input name="telephone" type="tel" required></label><label>Commune<input name="commune" required placeholder="Manduel"></label></div>
-      <label>Intérêt<input name="interets" placeholder="Piscine, Maison fermée"></label>
+      <label>Intérêt<input name="interets" placeholder="Piscine, Maison"></label>
       <button class="principal">Enregistrer et attribuer</button>
       <p class="message" id="m" role="status"></p>
     </form>` : ''}`;
