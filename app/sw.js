@@ -1,7 +1,7 @@
 // L'outil s'ouvre même sans réseau au fond d'un jardin : la coquille est gardée en cache.
 // Les données, elles, ne passent jamais par ce cache : elles vont toujours au serveur.
-const VERSION = 'flamingo-terrain-6';
-const COQUILLE = ['./', 'index.html', 'app.css?v=6', 'commun.js?v=2', 'formulaires.js?v=2', 'app.js?v=6', 'admin.js?v=6', 'tournee.js?v=2', 'carnet.js?v=2',
+const VERSION = 'flamingo-terrain-7';
+const COQUILLE = ['./', 'index.html', 'app.css?v=6', 'commun.js?v=2', 'formulaires.js?v=3', 'app.js?v=6', 'admin.js?v=6', 'tournee.js?v=2', 'carnet.js?v=2',
   'vendor/leaflet/leaflet.js?v=1.9.4', 'vendor/leaflet/leaflet.css?v=1.9.4', 'vendor/qrcode.js?v=1.4.4', 'icone.png', 'flamant.png', 'manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {

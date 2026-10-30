@@ -1246,11 +1246,14 @@ function a_export(): void
     $q = $db->prepare("SELECT v.quand, v.type, v.auteur, v.alertes, v.duree_min, v.charge, v.envoye_le, v.donnees, c.prenom, c.nom, c.commune, a.nom AS agence
         FROM visites v JOIN clients c ON c.id = v.client_id LEFT JOIN agences a ON a.id = c.agence_id WHERE ($w) AND v.quand >= ? ORDER BY v.quand DESC");
     $q->execute([...$p, date('c', strtotime('-365 days'))]);
-    envoyer_csv("visites-$jour.csv", ['Date', 'Type', 'Agence', 'Client', 'Commune', 'Technicien', 'Points à reprendre', 'Durée (min)', 'Charge', 'Envoyé', 'pH', 'Chlore libre', 'TAC'],
+    envoyer_csv("visites-$jour.csv", ['Date', 'Type', 'Agence', 'Client', 'Commune', 'Technicien', 'Points à reprendre', 'Durée (min)', 'Charge', 'Envoyé', 'pH', 'Chlore libre', 'TAC', 'Signé', 'Raison du refus', 'À 179 €', 'Quartier', 'Formule proposée', 'Prix proposé'],
         array_map(function ($v) {
             $c = json_decode($v['donnees'], true) ?: [];
             $m = $c['valeurs'] ?? [];
-            return [substr($v['quand'], 0, 16), $v['type'], $v['agence'], trim($v['prenom'] . ' ' . $v['nom']), $v['commune'], $v['auteur'], $v['alertes'], $v['duree_min'], $v['charge'], $v['envoye_le'] ? 'oui' : 'non', $m['ph'] ?? '', $m['chlore_libre'] ?? '', $m['tac'] ?? ''];
+            $i = $c['interne'] ?? [];
+            $pr = $c['proposition'] ?? [];
+            return [substr($v['quand'], 0, 16), $v['type'], $v['agence'], trim($v['prenom'] . ' ' . $v['nom']), $v['commune'], $v['auteur'], $v['alertes'], $v['duree_min'], $v['charge'], $v['envoye_le'] ? 'oui' : 'non', $m['ph'] ?? '', $m['chlore_libre'] ?? '', $m['tac'] ?? '',
+                $i['signe'] ?? '', $i['raison_refus'] ?? '', $i['a_179'] ?? '', $i['quartier'] ?? '', $pr['formule'] ?? '', $pr['prix'] ?? ''];
         }, $q->fetchAll()));
 }
 

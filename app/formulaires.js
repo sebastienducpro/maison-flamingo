@@ -69,6 +69,10 @@ const FORMULAIRES = {
       { titre: 'Ce qu\'on a vu', champs: [ { type: 'constats' } ] },
       { titre: 'Notre proposition', champs: [ { type: 'proposition' } ] },
       { titre: 'Pour toi seul', interne: true, champs: [
+        { type: 'choix', cle: 'signe', libelle: 'Il a signé', options: ['Oui', 'Non', 'À relancer'] },
+        { type: 'choix', cle: 'raison_refus', libelle: 'Si non, pourquoi', options: ['Le prix', 'Pas le moment', 'Le fait lui-même', 'A déjà quelqu\'un', 'Autre'] },
+        { type: 'choix', cle: 'a_179', libelle: '« À 179 €, vous auriez signé ? »', options: ['Oui', 'Non', 'Hésite'] },
+        { type: 'texte', cle: 'quartier', libelle: 'Quartier', aide: 'Le Mail, centre, route de Redessan… Un test de prix se mène un quartier à la fois' },
         { type: 'ouinon', cle: 'dans_zone', libelle: 'Dans la zone' },
         { type: 'nombre', cle: 'voisins_piscine', libelle: 'Piscines dans la rue', unite: '' },
         { type: 'ouinon', cle: 'decideur', libelle: 'J\'ai vu la personne qui décide' },
