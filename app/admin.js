@@ -379,6 +379,31 @@ async function vueJournal() {
     <tbody>${d.lignes.map((l) => `<tr class="${/refus|frein/.test(l.action) ? 'refus' : ''}"><td class="date">${echapper(new Date(l.quand).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }))}</td><td>${echapper(l.qui)}</td><td>${echapper(l.action)}</td><td>${echapper(l.detail)}</td></tr>`).join('')}</tbody></table></div>`;
 }
 
+/* ---------- Corbeille : ce qui a été effacé ou remplacé, et qu'on remet d'un clic ---------- */
+
+async function vueCorbeille() {
+  vue().innerHTML = '<p class="chargement">Chargement…</p>';
+  const d = await api('corbeille');
+  if (!d.ok) return;
+  const court = (v) => (v === '' || v === null ? 'vide' : '« ' + (v.length > 160 ? v.slice(0, 160) + '…' : v) + ' »');
+  const enCours = d.elements.filter((k) => !k.remis_le);
+  vue().innerHTML = `<h1>Corbeille <span class="aide">${d.jours} derniers jours</span></h1>
+    <p class="aide">Ce qu'on efface dans le carnet, et l'ancienne version de ce qu'on réécrit dans une fiche client ou le carnet, arrive ici avec qui l'a fait et quand. Le remettre ne touche à rien d'autre ; et la version qu'on écarte en le remettant revient ici à son tour. Après ${d.jours} jours, la corbeille se vide.</p>
+    ${enCours.length ? `<ul class="liste">${enCours.map((k) => `<li class="membre"><div class="reco-tete"><strong>${echapper(k.quoi)}</strong> <span>${echapper(k.libelle)} · <a href="#/client/${k.client_id}">${echapper(k.client)}</a></span>${pastilleDe(k.nature === 'efface' ? ['rouge', 'Effacé'] : ['orange', 'Remplacé'])}</div>
+      <span class="sous">${echapper(k.qui)} · ${echapper(dateFr(k.quand))}</span>
+      ${k.ecarts.length ? `<ul class="ecarts">${k.ecarts.map((e) => `<li><strong>${echapper(e.champ)}</strong> : avant ${echapper(court(e.avant))}${e.maintenant !== null ? ', aujourd\'hui ' + echapper(court(e.maintenant)) : ''}</li>`).join('')}</ul>` : ''}
+      <div class="actions-ligne"><button class="secondaire" data-remettre="${k.id}">${k.nature === 'efface' ? 'Le remettre' : 'Remettre cette version'}</button></div><p class="message" role="status"></p></li>`).join('')}</ul>`
+      : '<p class="aide">Rien dans la corbeille.</p>'}
+    ${d.elements.length > enCours.length ? `<h2>Déjà remis</h2><ul class="liste">${d.elements.filter((k) => k.remis_le).map((k) => `<li class="membre"><span>${echapper(k.quoi)} · ${echapper(k.libelle)} · ${echapper(k.client)}</span><span class="sous">remis le ${echapper(dateFr(k.remis_le))} par ${echapper(k.remis_par)}</span></li>`).join('')}</ul>` : ''}`;
+  vue().querySelectorAll('[data-remettre]').forEach((b) => b.addEventListener('click', async () => {
+    b.disabled = true;
+    const r = await api('corbeille_remettre', { methode: 'POST', corps: { id: +b.dataset.remettre } });
+    if (r.ok) return vueCorbeille();
+    b.closest('li').querySelector('.message').textContent = { present: 'C\'est déjà là : rien à remettre.', client: 'Le client a été effacé depuis : remettez d\'abord sa fiche.', introuvable: 'L\'élément n\'existe plus.', fichier: 'Le fichier n\'a pas été retrouvé.', deja: 'Déjà remis.' }[r.erreur] || 'Rien n\'a été remis.';
+    b.disabled = false;
+  }));
+}
+
 /* ---------- Sauvegardes ---------- */
 
 async function vueSauvegardes() {
@@ -413,7 +438,34 @@ async function vueSauvegardes() {
     <div class="table-defile"><table><thead><tr><th>Quand</th><th>Origine</th><th>Taille</th><th>État</th><th>Hors hébergeur</th><th></th></tr></thead>
     <tbody>${d.sauvegardes.map((s) => `<tr class="${s.statut === 'ok' ? '' : 'refus'}"><td>${echapper(dateFr(s.quand))}</td><td>${echapper(s.origine)}</td><td>${s.octets ? octets(s.octets) : '–'}</td><td>${s.statut === 'ok' ? 'relue' : 'échec : ' + echapper(s.detail)}</td>
       <td>${s.externe_statut === 'ok' ? 'arrivée intacte' : s.externe_statut === 'echec' ? 'échec : ' + echapper(s.externe_detail) : '–'}</td>
-      <td>${s.present ? `<a href="api.php?action=sauvegarde_telecharger&id=${s.id}">Télécharger</a>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
+      <td>${s.present ? `<a href="api.php?action=sauvegarde_telecharger&id=${s.id}">Télécharger</a> · <button class="discret" data-restaurer="${s.id}" data-quand="${echapper(s.quand)}">Revenir à cette copie</button>` : ''}</td></tr>`).join('')}</tbody></table></div>
+    <form id="restaurer" class="carte" hidden>
+      <h2>Revenir à la copie du <span id="r-quand"></span></h2>
+      <p>Ce qui existait dans cette copie revient tel qu'il était : fiches clients, carnets, absences, secteurs, saisies du pilotage. Ce qui a été créé depuis reste : un lead arrivé ce matin, un rapport envoyé hier ne disparaissent pas.</p>
+      <p>Ne bougent jamais : le journal, la corbeille, les contrats, les factures et les mandats, les comptes de l'équipe et leurs accès, la grille et l'identité des sociétés. Un accès retiré depuis reste retiré.</p>
+      <p class="aide">L'état d'aujourd'hui est d'abord copié, sous le nom « avant restauration » : rien de ce qu'il contenait n'est perdu. Pour un seul élément effacé ou réécrit, la <a href="#/corbeille">corbeille</a> suffit, sans rien toucher d'autre.</p>
+      <label>La raison <span class="aide">elle part au journal</span><input name="motif" required maxlength="300"></label>
+      <label>Tapez RESTAURER pour confirmer<input name="confirmation" autocomplete="off" required></label>
+      <div class="actions-ligne"><button class="principal">Revenir à cette copie</button><button type="button" class="discret" id="r-annuler">Annuler</button></div>
+      <p class="message" id="m-restaurer" role="status"></p>
+    </form>`;
+  const fr = document.getElementById('restaurer');
+  vue().querySelectorAll('[data-restaurer]').forEach((b) => b.addEventListener('click', () => {
+    fr.hidden = false; fr.dataset.id = b.dataset.restaurer;
+    document.getElementById('r-quand').textContent = dateFr(b.dataset.quand);
+    fr.scrollIntoView({ behavior: 'smooth' }); fr.motif.focus();
+  }));
+  document.getElementById('r-annuler').addEventListener('click', () => { fr.hidden = true; });
+  fr.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const mr = document.getElementById('m-restaurer');
+    mr.textContent = 'Copie de l\'état actuel, puis restauration…';
+    fr.querySelector('.principal').disabled = true;
+    const r = await api('sauvegarde_restaurer', { methode: 'POST', corps: { id: +fr.dataset.id, motif: fr.motif.value.trim(), confirmation: fr.confirmation.value.trim() } });
+    fr.querySelector('.principal').disabled = false;
+    if (r.ok) { mr.textContent = 'C\'est fait. L\'état d\'avant est gardé dans la copie « avant restauration ».'; setTimeout(vueSauvegardes, 2500); return; }
+    mr.textContent = r.erreur === 'confirmation' ? 'Donnez la raison et tapez RESTAURER en capitales.' : 'Rien n\'a changé : ' + (r.detail || 'la restauration a été refusée') + '.';
+  });
   const m = document.getElementById('m');
   document.getElementById('lancer').addEventListener('click', async () => {
     m.textContent = 'Copie en cours…';

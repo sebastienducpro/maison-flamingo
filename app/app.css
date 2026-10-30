@@ -250,3 +250,7 @@ a.lien-fiche strong::after{content:' →'}
 
 /* Un élément masqué reste masqué, même quand sa classe l'affiche en flex : sinon deux écrans s'empilent sans erreur. */
 [hidden]{display:none!important}
+
+/* La corbeille : ce qui a changé, champ par champ */
+.ecarts { margin: .4rem 0 0; padding-left: 1.1rem; font-size: .9em; }
+.ecarts li { margin: .15rem 0; overflow-wrap: anywhere; }

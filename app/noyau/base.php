@@ -11,7 +11,7 @@ date_default_timezone_set('Europe/Paris');
 // Un avertissement glissé dans une réponse casse le JSON et peut montrer un chemin du serveur.
 ini_set('display_errors', '0');
 
-const VERSION_SCHEMA = 13;
+const VERSION_SCHEMA = 14;
 const TAILLE_PHOTO_MAX = 4000000;
 const PHOTOS_MAX = 6;
 const EXPEDITEUR = 'contact@maisonflamingo.fr';
@@ -364,6 +364,11 @@ function migrer(PDO $db): void
     foreach (['juriste_nom', 'juriste_le', 'indice_travail_nom', 'indice_travail_valeur', 'indice_travail_periode', 'indice_produits_nom', 'indice_produits_valeur', 'indice_produits_periode'] as $k) {
         $db->prepare("INSERT OR IGNORE INTO parametres (cle, valeur, maj_le, maj_par) SELECT 'contrats.' || ?, valeur, maj_le, maj_par FROM parametres WHERE cle = 'societe.' || ?")->execute([$k, $k]);
     }
+    // Version 14 : la corbeille, où va ce qui est effacé ou remplacé dans la fiche et le carnet d'un client.
+    $db->exec("CREATE TABLE IF NOT EXISTS corbeille (id INTEGER PRIMARY KEY, quand TEXT NOT NULL, qui TEXT NOT NULL, role TEXT NOT NULL DEFAULT '', agence_id INTEGER,
+        client_id INTEGER NOT NULL, quoi TEXT NOT NULL, ligne_id INTEGER NOT NULL, nature TEXT NOT NULL, libelle TEXT NOT NULL DEFAULT '', contenu TEXT NOT NULL,
+        champs TEXT NOT NULL DEFAULT '[]', fichier TEXT, remis_le TEXT, remis_par TEXT);
+        CREATE INDEX IF NOT EXISTS i_corbeille_client ON corbeille (client_id, id)");
     $db->exec("INSERT OR IGNORE INTO parametres (cle, valeur, maj_le, maj_par) SELECT 'facturation.piscine.taux_tva', valeur, maj_le, maj_par FROM parametres WHERE cle = 'facturation.taux_tva'");
     // L'accès GoCardless posé avant la v13 était celui de la seule société : il devient celui de la société Piscine.
     $ancien = dossier_donnees() . '/paiement-gocardless.json';
@@ -394,7 +399,7 @@ function tracer($qui, string $action, string $detail = ''): void
     $role = is_array($qui) ? (string) ($qui['role'] ?? '') : '';
     $agence = is_array($qui) && isset($qui['agence_id']) ? (int) $qui['agence_id'] : null;
     base()->prepare('INSERT INTO journal (quand, qui, action, detail, role, agence_id) VALUES (?,?,?,?,?,?)')
-        ->execute([maintenant(), mb_substr($nom, 0, 120), $action, mb_substr($detail, 0, 500), $role, $agence]);
+        ->execute([maintenant(), mb_substr($nom, 0, 120), $action, mb_substr($detail, 0, 1500), $role, $agence]);
 }
 
 function compter_alertes(array $contenu): int

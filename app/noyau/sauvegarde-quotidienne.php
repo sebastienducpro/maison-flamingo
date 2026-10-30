@@ -8,7 +8,7 @@ if (PHP_SAPI !== 'cli') {
     exit;
 }
 // Les mêmes fichiers que l'API : le relevé du lundi refait le calcul du pilotage, qui s'appuie sur tous.
-foreach (['base', 'acces', 'tournees', 'sauvegardes', 'externe', 'equipe', 'espace', 'carnet', 'leads', 'pilotage', 'absences', 'personnel', 'releve', 'contrats', 'paiements'] as $f) {
+foreach (['base', 'acces', 'tournees', 'sauvegardes', 'externe', 'equipe', 'espace', 'carnet', 'leads', 'pilotage', 'absences', 'personnel', 'releve', 'contrats', 'paiements', 'corbeille'] as $f) {
     require __DIR__ . '/' . $f . '.php';
 }
 $r = faire_sauvegarde('tâche planifiée');
@@ -17,5 +17,6 @@ $r = faire_sauvegarde('tâche planifiée');
 $r['hors_hebergeur'] = $r['ok'] ? envoyer_hors_hebergeur($r['fichier']) : ['ok' => false, 'erreur' => 'pas de copie'];
 $r['releves'] = releves_du_lundi();
 $r['facturation'] = facturation_automatique_du_mois();
+$r['corbeille'] = purger_corbeille();
 echo json_encode($r, JSON_UNESCAPED_UNICODE), "\n";
 exit($r['ok'] ? 0 : 1);

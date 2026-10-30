@@ -161,8 +161,8 @@ function accueilDuRole() {
 
 const MENUS = {
   technicien: [['#/tournee', 'Tournée'], ['#/leads', 'Leads'], ['#/clients', 'Clients'], ['#/demandes', 'Demandes'], ['#/compte', 'Compte']],
-  chef: [['#/tableau', 'Tableau'], ['#/pilotage', 'Pilotage'], ['#/leads', 'Leads'], ['#/tournee', 'Tournées'], ['#/charge', 'Semaine'], ['#/absences', 'Absences'], ['#/clients', 'Clients'], ['#/secteurs', 'Secteurs'], ['#/equipe', 'Équipe'], ['#/demandes', 'Demandes'], ['#/compte', 'Compte']],
-  superadmin: [['#/tableau', 'Tableau'], ['#/pilotage', 'Pilotage'], ['#/leads', 'Leads'], ['#/tournee', 'Tournées'], ['#/charge', 'Semaine'], ['#/absences', 'Absences'], ['#/clients', 'Clients'], ['#/secteurs', 'Secteurs'], ['#/equipe', 'Équipe'], ['#/agences', 'Agences'], ['#/demandes', 'Demandes'], ['#/sauvegardes', 'Sauvegardes'], ['#/journal', 'Journal'], ['#/compte', 'Compte']],
+  chef: [['#/tableau', 'Tableau'], ['#/pilotage', 'Pilotage'], ['#/leads', 'Leads'], ['#/tournee', 'Tournées'], ['#/charge', 'Semaine'], ['#/absences', 'Absences'], ['#/clients', 'Clients'], ['#/secteurs', 'Secteurs'], ['#/equipe', 'Équipe'], ['#/demandes', 'Demandes'], ['#/corbeille', 'Corbeille'], ['#/compte', 'Compte']],
+  superadmin: [['#/tableau', 'Tableau'], ['#/pilotage', 'Pilotage'], ['#/leads', 'Leads'], ['#/tournee', 'Tournées'], ['#/charge', 'Semaine'], ['#/absences', 'Absences'], ['#/clients', 'Clients'], ['#/secteurs', 'Secteurs'], ['#/equipe', 'Équipe'], ['#/agences', 'Agences'], ['#/demandes', 'Demandes'], ['#/sauvegardes', 'Sauvegardes'], ['#/journal', 'Journal'], ['#/corbeille', 'Corbeille'], ['#/compte', 'Compte']],
 };
 
 // Ce qui attend : un chiffre sur Leads et Demandes, relu toutes les minutes. L'écran rappelle, il ne décide pas.
@@ -220,6 +220,7 @@ async function route() {
       case 'demandes': return await vueDemandes();
       case 'sauvegardes': return await vueSauvegardes();
       case 'journal': return await vueJournal();
+      case 'corbeille': return await vueCorbeille();
       case 'compte': return await vueCompte();
       case 'clients': return await vueClients();
       default: return aller(accueilDuRole());

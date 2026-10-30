@@ -85,10 +85,15 @@ function a_carnet_poste(): void
     if (!isset(POSTES[$cle]) || !in_array($etat, array_merge(ETATS_POSTE, ['']), true)) {
         sortir(400, ['ok' => false, 'erreur' => 'donnees']);
     }
+    $av = base()->prepare('SELECT * FROM carnet_postes WHERE client_id = ? AND cle = ?');
+    $av->execute([$c['id'], $cle]);
+    $avant = $av->fetch();
+    $detail = texte($d['detail'] ?? '', 200);
     base()->prepare('INSERT INTO carnet_postes (client_id, cle, etat, detail, maj_le, maj_par) VALUES (?,?,?,?,?,?)
         ON CONFLICT(client_id, cle) DO UPDATE SET etat = excluded.etat, detail = excluded.detail, maj_le = excluded.maj_le, maj_par = excluded.maj_par')
-        ->execute([$c['id'], $cle, $etat, texte($d['detail'] ?? '', 200), maintenant(), $u['nom']]);
-    tracer($u, 'carnet : poste', "{$c['id']} $cle $etat");
+        ->execute([$c['id'], $cle, $etat, $detail, maintenant(), $u['nom']]);
+    $e = $avant ? garder_version($u, 'carnet_postes', $avant, ['etat' => $etat, 'detail' => $detail], ['etat', 'detail'], POSTES[$cle]) : '';
+    tracer($u, 'carnet : poste', "{$c['id']} $cle $etat" . ($e ? " · $e" : ''));
     sortir(200, ['ok' => true]);
 }
 
@@ -108,14 +113,19 @@ function a_carnet_evenement(): void
     $valeurs = [$quand, texte($d['echeance'] ?? '', 60), $titre, texte($d['detail'] ?? '', 500), $organise, $statut];
     $db = base();
     $eid = entier($d['evenement_id'] ?? 0);
+    $e = '';
     if ($eid > 0) {
+        $av = $db->prepare('SELECT * FROM carnet_evenements WHERE id = ? AND client_id = ?');
+        $av->execute([$eid, $c['id']]);
+        $avant = $av->fetch();
         $q = $db->prepare('UPDATE carnet_evenements SET quand = ?, echeance = ?, titre = ?, detail = ?, organise = ?, statut = ? WHERE id = ? AND client_id = ?');
         $q->execute([...$valeurs, $eid, $c['id']]);
+        $e = $avant ? garder_version($u, 'carnet_evenements', $avant, array_combine(['quand', 'echeance', 'titre', 'detail', 'organise', 'statut'], $valeurs), ['quand', 'echeance', 'titre', 'detail', 'organise', 'statut'], $avant['titre']) : '';
     } else {
         $db->prepare('INSERT INTO carnet_evenements (quand, echeance, titre, detail, organise, statut, client_id, cree_le) VALUES (?,?,?,?,?,?,?,?)')
             ->execute([...$valeurs, $c['id'], maintenant()]);
     }
-    tracer($u, 'carnet : calendrier', "{$c['id']} $titre");
+    tracer($u, 'carnet : calendrier', "{$c['id']} $titre" . ($e ? " · $e" : ''));
     sortir(200, ['ok' => true]);
 }
 
@@ -125,7 +135,13 @@ function a_carnet_evenement_supprimer(): void
     exiger_post();
     $d = entree();
     $c = exiger_client_autorise($u, entier($d['id'] ?? 0));
-    base()->prepare('DELETE FROM carnet_evenements WHERE id = ? AND client_id = ?')->execute([entier($d['evenement_id'] ?? 0), $c['id']]);
+    $q = base()->prepare('SELECT * FROM carnet_evenements WHERE id = ? AND client_id = ?');
+    $q->execute([entier($d['evenement_id'] ?? 0), $c['id']]);
+    if ($ev = $q->fetch()) {
+        mettre_a_la_corbeille($u, 'carnet_evenements', $ev, 'efface', $ev['titre']);
+        base()->prepare('DELETE FROM carnet_evenements WHERE id = ?')->execute([$ev['id']]);
+        tracer($u, 'carnet : calendrier effacé', "{$c['id']} « {$ev['titre']} » " . ($ev['quand'] ?? '') . ', gardé dans la corbeille');
+    }
     sortir(200, ['ok' => true]);
 }
 
@@ -141,12 +157,17 @@ function a_carnet_equipement(): void
     }
     $db = base();
     $qid = entier($d['equipement_id'] ?? 0);
+    $e = '';
     if ($qid > 0) {
+        $av = $db->prepare('SELECT * FROM carnet_equipements WHERE id = ? AND client_id = ?');
+        $av->execute([$qid, $c['id']]);
+        $avant = $av->fetch();
         $db->prepare('UPDATE carnet_equipements SET nom = ?, detail = ?, maj_le = ? WHERE id = ? AND client_id = ?')->execute([$nom, texte($d['detail'] ?? '', 200), maintenant(), $qid, $c['id']]);
+        $e = $avant ? garder_version($u, 'carnet_equipements', $avant, ['nom' => $nom, 'detail' => texte($d['detail'] ?? '', 200)], ['nom', 'detail'], $avant['nom']) : '';
     } else {
         $db->prepare('INSERT INTO carnet_equipements (client_id, nom, detail, maj_le) VALUES (?,?,?,?)')->execute([$c['id'], $nom, texte($d['detail'] ?? '', 200), maintenant()]);
     }
-    tracer($u, 'carnet : équipement', "{$c['id']} $nom");
+    tracer($u, 'carnet : équipement', "{$c['id']} $nom" . ($e ? " · $e" : ''));
     sortir(200, ['ok' => true]);
 }
 
@@ -156,7 +177,13 @@ function a_carnet_equipement_supprimer(): void
     exiger_post();
     $d = entree();
     $c = exiger_client_autorise($u, entier($d['id'] ?? 0));
-    base()->prepare('DELETE FROM carnet_equipements WHERE id = ? AND client_id = ?')->execute([entier($d['equipement_id'] ?? 0), $c['id']]);
+    $q = base()->prepare('SELECT * FROM carnet_equipements WHERE id = ? AND client_id = ?');
+    $q->execute([entier($d['equipement_id'] ?? 0), $c['id']]);
+    if ($eq = $q->fetch()) {
+        mettre_a_la_corbeille($u, 'carnet_equipements', $eq, 'efface', $eq['nom']);
+        base()->prepare('DELETE FROM carnet_equipements WHERE id = ?')->execute([$eq['id']]);
+        tracer($u, 'carnet : équipement effacé', "{$c['id']} « {$eq['nom']} », gardé dans la corbeille");
+    }
     sortir(200, ['ok' => true]);
 }
 
@@ -201,13 +228,12 @@ function a_carnet_document_supprimer(): void
     exiger_post();
     $d = entree();
     $c = exiger_client_autorise($u, entier($d['id'] ?? 0));
-    $q = base()->prepare('SELECT fichier FROM carnet_documents WHERE id = ? AND client_id = ?');
+    $q = base()->prepare('SELECT * FROM carnet_documents WHERE id = ? AND client_id = ?');
     $q->execute([entier($d['document_id'] ?? 0), $c['id']]);
-    $f = $q->fetchColumn();
-    if ($f) {
-        @unlink(dossier_documents((int) $c['id']) . '/' . basename((string) $f));
-        base()->prepare('DELETE FROM carnet_documents WHERE id = ? AND client_id = ?')->execute([entier($d['document_id'] ?? 0), $c['id']]);
-        tracer($u, 'carnet : document supprimé', (string) $c['id']);
+    if ($doc = $q->fetch()) {
+        mettre_a_la_corbeille($u, 'carnet_documents', $doc, 'efface', $doc['titre'], [], dossier_documents((int) $c['id']) . '/' . basename((string) $doc['fichier']));
+        base()->prepare('DELETE FROM carnet_documents WHERE id = ?')->execute([$doc['id']]);
+        tracer($u, 'carnet : document supprimé', "{$c['id']} « {$doc['titre']} », gardé dans la corbeille");
     }
     sortir(200, ['ok' => true]);
 }

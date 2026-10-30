@@ -536,7 +536,9 @@ function a_client_enregistrer(): void
         $db->prepare("INSERT INTO clients ($cols) VALUES ($marques)")->execute(array_values($c));
         $id = (int) $db->lastInsertId();
     }
-    tracer($u, 'client enregistré', (string) $id);
+    // L'ancienne fiche part dans la corbeille ; le journal dit ce qui a changé, de quoi à quoi.
+    $e = $avant ? garder_version($u, 'clients', $avant, $c, CHAMPS_CLIENT, trim($avant['prenom'] . ' ' . $avant['nom'])) : '';
+    tracer($u, 'client enregistré', (string) $id . ($e ? " · $e" : ''));
     sortir(200, ['ok' => true, 'id' => $id, 'carte' => $c['lat'] !== null]);
 }
 
@@ -560,6 +562,13 @@ function a_client_supprimer(): void
         @unlink($f);
     }
     @rmdir(dossier_documents((int) $c['id']));
+    // L'effacement vaut aussi pour la corbeille : on n'y garde pas ce que le client a demandé d'effacer.
+    $k = $db->prepare('SELECT fichier FROM corbeille WHERE client_id = ? AND fichier IS NOT NULL');
+    $k->execute([$c['id']]);
+    foreach ($k->fetchAll(PDO::FETCH_COLUMN) as $f) {
+        @unlink(dossier_corbeille() . '/' . basename((string) $f));
+    }
+    $db->prepare('DELETE FROM corbeille WHERE client_id = ?')->execute([$c['id']]);
     $db->prepare('DELETE FROM clients WHERE id = ?')->execute([$c['id']]);
     tracer($u, 'client supprimé', $c['id'] . ' ' . $c['prenom'] . ' ' . $c['nom']);
     sortir(200, ['ok' => true]);
@@ -1381,7 +1390,7 @@ function a_sauvegardes(): void
         $s['present'] = $s['statut'] === 'ok' && is_file(dossier_sauvegardes() . '/' . basename($s['fichier']));
     }
     $c = externe_config();
-    sortir(200, ['ok' => true, 'sauvegardes' => $l, 'age_max_h' => SAUVEGARDE_AGE_MAX / 3600,
+    sortir(200, ['ok' => true, 'sauvegardes' => $l, 'age_max_h' => SAUVEGARDE_AGE_MAX / 3600, 'restaurees' => TABLES_RESTAUREES, 'gardees' => TABLES_GARDEES,
         'externe' => ['configure' => (bool) $c, 'point' => $c['point'] ?? '', 'seau' => $c['seau'] ?? '', 'region' => $c['region'] ?? '']]);
 }
 

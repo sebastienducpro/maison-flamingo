@@ -116,7 +116,7 @@ async function vueCarnet(id) {
     if (r.ok) vueCarnet(c.id); else md.textContent = r.erreur === 'type' ? 'Seuls les PDF et les photos sont acceptés.' : 'Le fichier n\'est pas passé (8 Mo au plus).';
   });
   vue().querySelectorAll('[data-suppr-doc]').forEach((b) => b.addEventListener('click', async () => {
-    if (!confirm('Supprimer ce document du carnet du client ?')) return;
+    if (!confirm('Retirer ce document du carnet du client ? Il reste 90 jours dans la corbeille.')) return;
     await api('carnet_document_supprimer', { methode: 'POST', corps: { id: c.id, document_id: +b.dataset.supprDoc } });
     vueCarnet(c.id);
   }));

@@ -21,6 +21,7 @@ require __DIR__ . '/noyau/personnel.php';
 require __DIR__ . '/noyau/releve.php';
 require __DIR__ . '/noyau/contrats.php';
 require __DIR__ . '/noyau/paiements.php';
+require __DIR__ . '/noyau/corbeille.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
@@ -48,6 +49,7 @@ const ACTIONS = [
     'releve_essai', 'releve_preference', 'avis_noter',
     'societe', 'societe_enregistrer', 'grille', 'grille_enregistrer', 'contrats', 'contrat_tarif', 'contrat_preparer', 'contrat_annuler', 'contrat_document', 'contrat_rappel_noter',
     'espace_contrat', 'espace_contrat_signer', 'espace_contrat_retracter', 'espace_resilier',
+    'corbeille', 'corbeille_remettre', 'sauvegarde_restaurer',
     'espace_mandat', 'espace_factures', 'gocardless_webhook', 'facturation', 'facturation_configurer', 'facturation_emettre', 'facturation_automatique', 'facture_document',
 ];
 
