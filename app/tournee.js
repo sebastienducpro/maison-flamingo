@@ -116,19 +116,20 @@ async function vueCharge(agence) {
   vue().innerHTML = '<p class="chargement">Chargement…</p>';
   const [d, l] = await Promise.all([api('charge', { params: agence ? { agence } : {} }), api('longues')]);
   if (!d.ok) return;
-  // Une journée pleine fait environ sept heures, trajets compris ; au-delà, on la soulage.
-  const niveauJour = (min) => (min === 0 ? 'vide' : min > 450 ? 'lourde' : min > 390 ? 'pleine' : min < 180 ? 'legere' : 'bonne');
+  // Les niveaux viennent du serveur, sur la charge réelle de la semaine : ni casser les gens (plus de 7 h 30 ou de dix piscines),
+  // ni payer des journées creuses (moins de 5 h). Les maisons fermées seules n'y pèsent qu'un quart : une visite par mois.
+  const niveauJour = (x) => ({ vide: 'vide', trop: 'lourde', creuse: 'legere', bonne: x.charge_min > 390 ? 'pleine' : 'bonne' }[x.niveau] || 'bonne');
   vue().innerHTML = `
     <div class="tete"><h1>La semaine</h1>${APP.utilisateur.role === 'superadmin' ? '<select id="agence" aria-label="Agence"></select>' : ''}</div>
-    <p class="aide">Chaque case : nombre d'arrêts et durée estimée de la journée, temps sur place mesuré et trajets compris. Une journée de dix gros chantiers pèse plus qu'une de vingt contrôles : c'est la durée qui compte.</p>
+    <p class="aide">Chaque case : nombre d'arrêts, piscines, et charge de la journée en heures, temps sur place mesuré et trajets compris. Une maison fermée seule n'y compte que pour un quart : on n'y passe qu'une semaine sur quatre. C'est la durée qui compte, et le nombre de piscines, qui use même quand l'horloge dit que ça tient.</p>
     <div class="table-defile"><table class="charge">
       <thead><tr><th>Technicien</th>${Object.values(d.jours).map((j) => `<th>${j.slice(0, 3)}</th>`).join('')}<th>Semaine</th></tr></thead>
       <tbody>${d.techniciens.map((t) => {
-        const total = Object.values(t.jours).reduce((s, j) => s + j.total_min, 0);
-        return `<tr><td>${echapper(t.nom)}</td>${Object.entries(t.jours).map(([j, x]) => `<td class="jour-${niveauJour(x.total_min)}"><a href="#/tournee/${t.id}/${j}">${x.visites ? `${x.visites} arrêt${x.visites > 1 ? 's' : ''}<br><strong>${heures(x.total_min)}</strong>` : '–'}</a></td>`).join('')}<td><strong>${heures(total)}</strong></td></tr>`;
+        const total = Object.values(t.jours).reduce((s, j) => s + j.charge_min, 0);
+        return `<tr><td>${echapper(t.nom)}</td>${Object.entries(t.jours).map(([j, x]) => `<td class="jour-${niveauJour(x)}"><a href="#/tournee/${t.id}/${j}">${x.visites ? `${x.visites} arrêt${x.visites > 1 ? 's' : ''} · ${x.piscines} pisc.<br><strong>${heures(x.charge_min)}</strong>` : '–'}</a></td>`).join('')}<td><strong>${heures(total)}</strong><br><span class="sous">${Math.round(total / (5 * d.seuils.cible) * 100)} %</span></td></tr>`;
       }).join('') || '<tr><td colspan="8">Aucun technicien actif.</td></tr>'}</tbody>
     </table></div>
-    <p class="legende-charge"><span class="jour-legere">moins de 3 h</span> <span class="jour-bonne">3 à 6 h 30</span> <span class="jour-pleine">6 h 30 à 7 h 30</span> <span class="jour-lourde">plus de 7 h 30</span></p>
+    <p class="legende-charge"><span class="jour-legere">creuse : moins de 5 h</span> <span class="jour-bonne">5 à 6 h 30</span> <span class="jour-pleine">6 h 30 à 7 h 30</span> <span class="jour-lourde">trop : plus de 7 h 30 ou plus de 10 piscines</span></p>
     <h2>Les piscines les plus longues <span class="aide">médiane des passages mesurés sur quatre mois</span></h2>
     ${l.ok && l.clients.length ? `<div class="table-defile"><table><thead><tr><th>Client</th><th>Jour</th><th>Technicien</th><th>Durée</th><th>Visites lourdes</th></tr></thead>
       <tbody>${l.clients.map((c) => `<tr><td><a href="#/client/${c.id}">${echapper(c.nom)}</a> <span class="sous">${echapper(c.commune)}</span></td><td>${echapper(c.jour)}</td><td>${echapper(c.technicien || '–')}</td><td><strong>${c.mediane} min</strong></td><td>${c.lourdes} sur ${c.visites}</td></tr>`).join('')}</tbody></table></div>`

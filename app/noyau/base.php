@@ -38,6 +38,16 @@ const DUREE_SESSION_CLIENT = 7776000;
 const DUREE_INVITATION = 604800;
 // Sans historique, une visite est estimée à ces durées ; dès trois visites mesurées, la médiane réelle prend le relais.
 const DUREE_DEFAUT = ['passage' => 30, 'diagnostic' => 60];
+// Avant trois passages mesurés, la durée se devine selon la formule : une maison fermée seule se visite plus vite
+// qu'une piscine, une maison avec piscine plus lentement. Dès que l'horloge a parlé, elle a raison.
+const DUREE_FORMULE = ['Piscine' => 30, 'Maison fermée' => 20, 'Piscine + Maison fermée' => 40];
+// Une maison fermée seule se visite une fois par mois : chaque semaine, elle ne pèse qu'un quart de sa visite.
+const PART_HEBDO_FORMULE = ['Maison fermée' => 0.25];
+// L'équilibre d'une journée, en minutes, trajets compris : ni casser les gens, ni payer des journées creuses.
+const JOURNEE_CIBLE_MIN = 420;   // sept heures
+const JOURNEE_MAX_MIN = 450;     // sept heures et demie, jamais au-delà
+const JOURNEE_CREUSE_MIN = 300;  // moins de cinq heures : une journée à regrouper ou à remplir
+const PISCINES_JOUR_MAX = 10;    // même dans le temps, au-delà c'est trop physique
 const VITESSE_KMH = 35;          // moyenne en périphérie nîmoise, feux et lotissements compris
 const DETOUR_ROUTE = 1.3;        // la route fait environ 30 % de plus que le vol d'oiseau
 const ESSAIS_IP = 10;        // échecs de connexion par quart d'heure et par adresse

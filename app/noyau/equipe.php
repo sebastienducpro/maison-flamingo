@@ -429,7 +429,7 @@ function a_client(): void
     $cc = $db->prepare('SELECT courriel, actif, derniere_connexion FROM comptes_clients WHERE client_id = ?');
     $cc->execute([$c['id']]);
     $compte = $cc->fetch() ?: null;
-    $plus = ['visites' => $visites, 'demandes' => $dm->fetchAll(), 'compte' => $compte, 'duree_estimee' => estimer_durees([(int) $c['id']])[(int) $c['id']]];
+    $plus = ['visites' => $visites, 'demandes' => $dm->fetchAll(), 'compte' => $compte, 'duree_estimee' => estimer_durees([(int) $c['id']], 'passage', [(int) $c['id'] => $c['formule']])[(int) $c['id']]];
     if (in_array($u['role'], ['chef', 'superadmin'], true)) {
         $t = $db->prepare("SELECT id, nom FROM utilisateurs WHERE role = 'technicien' AND actif = 1 AND agence_id = ? ORDER BY nom");
         $t->execute([$c['agence_id']]);
@@ -845,11 +845,13 @@ function a_charge(): void
         $jours = [];
         for ($j = 1; $j <= 6; $j++) {
             $b = bilan_journee($t, $j);
-            $jours[$j] = ['visites' => count($b['arrets']), 'total_min' => $b['propose']['total_min'], 'sur_place_min' => $b['actuel']['sur_place_min'], 'trajet_min' => $b['propose']['trajet_min']];
+            $jours[$j] = ['visites' => count($b['arrets']), 'total_min' => $b['propose']['total_min'], 'sur_place_min' => $b['actuel']['sur_place_min'], 'trajet_min' => $b['propose']['trajet_min'],
+                'charge_min' => $b['charge']['min'], 'piscines' => $b['charge']['piscines'], 'niveau' => $b['charge']['niveau']];
         }
         $lignes[] = ['id' => (int) $t['id'], 'nom' => $t['nom'], 'jours' => $jours];
     }
-    sortir(200, ['ok' => true, 'agence' => $agence, 'jours' => array_slice(JOURS, 0, 6, true), 'techniciens' => $lignes]);
+    sortir(200, ['ok' => true, 'agence' => $agence, 'jours' => array_slice(JOURS, 0, 6, true), 'techniciens' => $lignes,
+        'seuils' => ['cible' => JOURNEE_CIBLE_MIN, 'max' => JOURNEE_MAX_MIN, 'creuse' => JOURNEE_CREUSE_MIN, 'piscines' => PISCINES_JOUR_MAX]]);
 }
 
 function a_longues(): void

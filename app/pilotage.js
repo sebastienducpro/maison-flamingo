@@ -9,7 +9,7 @@ const NIVEAUX = {
 };
 const FAMILLES = [
   ['Les clients', ['resiliations', 'rapports', 'jour_prevu', 'demandes', 'leads', 'note_google']],
-  ['L\'équipe', ['remplissage', 'passages_courts', 'departs', 'score_equipe', 'prime']],
+  ['L\'équipe', ['remplissage', 'journees', 'passages_courts', 'departs', 'score_equipe', 'prime']],
   ['L\'argent', ['tresorerie', 'ebitda', 'contribution', 'produits', 'prelevements']],
   ['La croissance', ['conversion', 'voisins']],
 ];
@@ -45,8 +45,8 @@ async function vuePilotage(agence) {
         <thead><tr><th>Indicateur</th><th>Valeur</th><th>Cible</th><th>État</th><th>Qui le suit</th></tr></thead>
         <tbody>${lignes.map(ligne).join('')}</tbody></table></div>` : '';
     }).join('')}
-    ${d.tournees.length ? `<h2>Remplissage par tournée <span class="aide">62 bassins par semaine au plus ; une maison fermée compte pour 0,2</span></h2>
-    <ul class="barres">${d.tournees.map((t) => `<li><span>${echapper(t.nom)}</span><meter min="0" max="1" low="0.6" high="0.85" optimum="0.8" value="${Math.min(t.remplissage, 1)}"></meter><strong>${Math.round(t.remplissage * 100)} %</strong></li>`).join('')}</ul>` : ''}
+    ${d.tournees.length ? `<h2>Remplissage par tournée <span class="aide">une semaine pleine fait 35 h, trajets compris ; une maison fermée seule compte pour un quart, puisqu'on n'y passe qu'une semaine sur quatre</span></h2>
+    <ul class="barres">${d.tournees.map((t) => `<li><span>${echapper(t.nom)}</span><meter min="0" max="1" low="0.6" high="0.85" optimum="0.8" value="${Math.min(t.remplissage, 1)}"></meter><strong>${heures(t.minutes)} · ${Math.round(t.remplissage * 100)} %</strong></li>`).join('')}</ul>` : ''}
     <h2>Saisie du mois <span class="aide">les chiffres que l'outil ne peut pas connaître</span></h2>
     <form id="saisie" class="carte">
       <div class="deux">

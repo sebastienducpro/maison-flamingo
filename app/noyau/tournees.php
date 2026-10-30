@@ -44,10 +44,13 @@ function minutes_route(float $km): int
     return (int) round($km / VITESSE_KMH * 60);
 }
 
-// Durée estimée par client : la médiane de ses dernières visites mesurées, sinon la valeur par défaut.
-function estimer_durees(array $ids, string $type = 'passage'): array
+// Durée estimée par client : la médiane de ses dernières visites mesurées, sinon la valeur par défaut de sa formule.
+function estimer_durees(array $ids, string $type = 'passage', array $formules = []): array
 {
-    $sortie = array_fill_keys($ids, DUREE_DEFAUT[$type] ?? 30);
+    $sortie = [];
+    foreach ($ids as $id) {
+        $sortie[$id] = ($type === 'passage' ? DUREE_FORMULE[$formules[$id] ?? ''] ?? null : null) ?? DUREE_DEFAUT[$type] ?? 30;
+    }
     if (!$ids) {
         return $sortie;
     }
@@ -150,7 +153,7 @@ function bilan_journee(array $technicien, int $jour): array
     $q->execute([(int) $technicien['id'], $jour]);
     $clients = $q->fetchAll();
     $ids = array_map(fn ($c) => (int) $c['id'], $clients);
-    $durees = estimer_durees($ids);
+    $durees = estimer_durees($ids, 'passage', array_combine($ids, array_map(fn ($c) => $c['formule'], $clients)) ?: []);
     $aujourdhui = date('Y-m-d');
     $faits = [];
     $charges = [];
@@ -193,5 +196,21 @@ function bilan_journee(array $technicien, int $jour): array
             'gain_min' => max(0, minutes_route($km_actuel) - minutes_route($km_propose)),
         ],
         'sans_position' => count($sans_position),
+        'charge' => charge_journee($arrets, minutes_route($km_propose)),
     ];
+}
+
+// Ce qu'une journée pèse vraiment une semaine donnée : les maisons fermées seules au quart (une visite par mois),
+// les trajets en entier, et le nombre de piscines, qui use même quand l'horloge dit que ça tient.
+function charge_journee(array $arrets, int $trajet_min): array
+{
+    $min = $trajet_min;
+    $piscines = 0;
+    foreach ($arrets as $a) {
+        $min += $a['duree'] * (PART_HEBDO_FORMULE[$a['formule']] ?? 1);
+        $piscines += str_contains($a['formule'], 'Piscine') || $a['formule'] === '' ? 1 : 0;
+    }
+    $min = (int) round($min);
+    return ['min' => $min, 'piscines' => $piscines,
+        'niveau' => $min === 0 ? 'vide' : ($min > JOURNEE_MAX_MIN || $piscines > PISCINES_JOUR_MAX ? 'trop' : ($min < JOURNEE_CREUSE_MIN ? 'creuse' : 'bonne'))];
 }

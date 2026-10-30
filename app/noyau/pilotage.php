@@ -9,8 +9,9 @@
 
 declare(strict_types=1);
 
-const CAPACITE_SEMAINE = 62;        // bassins par technicien et par semaine, pas un de plus (garde-fou qualité)
-const POIDS_FORMULE = ['Maison fermée' => 0.2, 'Piscine + Maison fermée' => 1.2];   // une maison fermée pèse 20 min sur 100
+// Une semaine tenable : cinq journées de sept heures, sur place et trajets compris. Le remplissage se mesure en heures
+// réellement passées chez les clients, pas en nombre de bassins : une maison avec piscine pèse ce qu'elle pèse.
+const SEMAINE_MIN = 5 * JOURNEE_CIBLE_MIN;
 const REMPLISSAGE_EMBAUCHE = 0.85;  // au-delà, on embauche avant de signer
 const REMPLISSAGE_BAS = 0.60;       // en dessous, on coupe la publicité, jamais les gens
 const PASSAGE_COURT_MIN = 20;       // un passage plus court déclenche un contrôle
@@ -92,6 +93,16 @@ const RECOMMANDATIONS = [
             'Relancer la prospection dans les rues déjà servies : le voisin d\'un client coûte le moins cher et raccourcit la tournée.',
             'Couper la publicité payante avant de toucher à l\'équipe : on coupe la pub, jamais les gens.',
             'Employer le temps libre à la formation et à la saison hérisson.']],
+    ],
+    'journees' => [
+        'alerte' => ['Des journées dépassent 7 h 30 ou 10 piscines', 'chef', [
+            'Déplacer une ou deux piscines vers un jour plus léger de la même semaine, en prévenant les clients concernés.',
+            'Placer les maisons fermées l\'après-midi, les piscines le matin.',
+            'Si toute la semaine est pleine, ce n\'est plus une question de planning : embaucher avant de signer.']],
+        'attention' => ['Des journées sont creuses', 'chef', [
+            'Regrouper ces clients sur moins de jours, si le jour promis aux clients le permet.',
+            'Y placer ce qui n\'a pas de jour fixe : interventions, diagnostics, saison hérisson, formation.',
+            'Remplir avec des voisins des rues déjà servies plutôt qu\'avec des clients isolés.']],
     ],
     'passages_courts' => [
         'alerte' => ['Trop de passages durent moins de 20 minutes', 'chef', [
@@ -189,6 +200,11 @@ function indicateur(string $cle, string $libelle, ?string $valeur, string $cible
 {
     return ['cle' => $cle, 'libelle' => $libelle, 'valeur' => $valeur, 'cible' => $cible, 'etat' => $etat,
         'proprietaire' => PROPRIETAIRES[$proprietaire] ?? $proprietaire, 'detail' => $detail, 'reco' => $reco ?? $cle];
+}
+
+function heures_lisibles(int $min): string
+{
+    return intdiv($min, 60) . ' h' . ($min % 60 ? ' ' . str_pad((string) ($min % 60), 2, '0', STR_PAD_LEFT) : '');
 }
 
 function pct(float $x): string
@@ -314,15 +330,27 @@ function a_pilotage(): void
             $note['valeur'] < 4.6 ? 'alerte' : ($note['valeur'] < 4.8 ? 'attention' : 'ok'), 'agence', 'Saisie de ' . $note['mois'] . ($note['agence'] ? ', ' . $note['agence'] : ''));
 
     // ---- L'équipe ----
-    // Le remplissage se compte en unités : une piscine 1, une maison fermée 0,2, les deux 1,2. 62 par semaine au plus.
-    $q = $db->prepare("SELECT u.id, u.nom, COALESCE(SUM(CASE WHEN c.id IS NULL THEN 0 WHEN c.formule = 'Maison fermée' THEN ? WHEN c.formule = 'Piscine + Maison fermée' THEN ? ELSE 1 END), 0) AS unites
-        FROM utilisateurs u LEFT JOIN clients c ON c.technicien_id = u.id AND c.statut = 'client'
-        WHERE u.role = 'technicien' AND u.actif = 1 AND u.hash <> ''" . ($agence ? ' AND u.agence_id = ?' : '') . ' GROUP BY u.id ORDER BY u.nom');
-    $q->execute([POIDS_FORMULE['Maison fermée'], POIDS_FORMULE['Piscine + Maison fermée'], ...$p]);
-    $tournees = array_map(fn ($r) => ['nom' => $r['nom'], 'unites' => round((float) $r['unites'], 1), 'remplissage' => round((float) $r['unites'] / CAPACITE_SEMAINE, 2)], $q->fetchAll());
+    // Ni les casser, ni les payer à rien faire, ni y perdre : chaque journée se mesure en heures, chaque semaine aussi.
+    $q = $db->prepare("SELECT id, nom, agence_id FROM utilisateurs WHERE role = 'technicien' AND actif = 1 AND hash <> ''" . ($agence ? ' AND agence_id = ?' : '') . ' ORDER BY nom');
+    $q->execute($p);
+    $tournees = [];
+    $trop = [];
+    $creuses = [];
+    foreach ($q->fetchAll() as $t) {
+        $semaine = 0;
+        for ($j = 1; $j <= 6; $j++) {
+            $c = bilan_journee($t, $j)['charge'];
+            $semaine += $c['min'];
+            if ($c['niveau'] === 'trop') {
+                $trop[] = $t['nom'] . ' le ' . mb_strtolower(JOURS[$j]) . ' (' . heures_lisibles($c['min']) . ', ' . $c['piscines'] . ' piscine' . ($c['piscines'] > 1 ? 's' : '') . ')';
+            } elseif ($c['niveau'] === 'creuse' && $j <= 5) {
+                $creuses[] = $t['nom'] . ' le ' . mb_strtolower(JOURS[$j]) . ' (' . heures_lisibles($c['min']) . ')';
+            }
+        }
+        $tournees[] = ['nom' => $t['nom'], 'minutes' => $semaine, 'remplissage' => round($semaine / SEMAINE_MIN, 2)];
+    }
     if (!$tournees) {
         $ind[] = indicateur('remplissage', 'Remplissage moyen des tournées', null, '75 à 85 %', 'pas_assez', 'direction', 'Aucun technicien actif.');
-        $plein = null;
     } else {
         $max = max(array_column($tournees, 'remplissage'));
         $moy = array_sum(array_column($tournees, 'remplissage')) / count($tournees);
@@ -332,8 +360,13 @@ function a_pilotage(): void
         $ind[] = indicateur('remplissage', 'Remplissage moyen des tournées', pct($moy), '75 à 85 %',
             $max > REMPLISSAGE_EMBAUCHE ? 'alerte' : ($moy < REMPLISSAGE_BAS ? 'attention' : 'ok'), 'direction',
             ($plein ? 'Au-delà de 85 % : ' . implode(', ', array_map(fn ($t) => $t['nom'] . ' (' . pct($t['remplissage']) . ')', $plein)) . ($deux_mois ? ', deux mois de suite' : '') . '. '
-                : 'Tournée la plus pleine : ' . pct($max) . '. ') . 'Capacité : ' . CAPACITE_SEMAINE . ' bassins par semaine.');
+                : 'Tournée la plus pleine : ' . pct($max) . '. ') . 'Une semaine pleine : ' . heures_lisibles(SEMAINE_MIN) . ', trajets compris ; les 15 % restants absorbent les absences et les imprévus.');
     }
+    $ind[] = !$tournees
+        ? indicateur('journees', 'Journées trop chargées ou creuses', null, 'entre 5 h et 7 h 30, 10 piscines au plus', 'pas_assez', 'chef', 'Aucun technicien actif.')
+        : indicateur('journees', 'Journées trop chargées ou creuses', $trop ? count($trop) . ' trop chargée' . (count($trop) > 1 ? 's' : '') : ($creuses ? count($creuses) . ' creuse' . (count($creuses) > 1 ? 's' : '') : 'aucune'),
+            'entre 5 h et 7 h 30, 10 piscines au plus', $trop ? 'alerte' : ($creuses ? 'attention' : 'ok'), 'chef',
+            $trop ? 'Trop chargées : ' . implode(', ', array_slice($trop, 0, 6)) . '.' : ($creuses ? 'Creuses : ' . implode(', ', array_slice($creuses, 0, 6)) . '.' : 'Toutes les journées tiennent entre 5 h et 7 h 30.'));
 
     [$mesures, $courts, $duree] = $un("SELECT COUNT(*), SUM(v.duree_min < ?), AVG(v.duree_min) FROM visites v JOIN clients c ON c.id = v.client_id
         WHERE $w AND v.type = 'passage' AND v.duree_min IS NOT NULL AND v.quand >= ?", [PASSAGE_COURT_MIN, ...$p, $il_y_a(30)]);
