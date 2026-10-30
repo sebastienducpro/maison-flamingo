@@ -370,7 +370,7 @@ function client_public(array $c): array
         'jour_passage' => $c['jour_passage'] !== null ? (int) $c['jour_passage'] : null, 'ordre' => (int) $c['ordre'], 'formule' => $c['formule'],
         'acces' => $c['acces'], 'lat' => $c['lat'] !== null ? (float) $c['lat'] : null, 'lon' => $c['lon'] !== null ? (float) $c['lon'] : null,
         'lead_recu_le' => $c['lead_recu_le'], 'lead_attribue_le' => $c['lead_attribue_le'], 'lead_contacte_le' => $c['lead_contacte_le'], 'lead_contact_par' => $c['lead_contact_par'],
-        'statut_depuis' => $c['statut_depuis'], 'statut_motif' => $c['statut_motif'],
+        'statut_depuis' => $c['statut_depuis'], 'statut_motif' => $c['statut_motif'], 'venu_par' => $c['venu_par'] ?? '',
     ];
 }
 
@@ -462,6 +462,8 @@ function a_client_enregistrer(): void
     foreach (['prenom' => 60, 'nom' => 60, 'telephone' => 30, 'courriel' => 120, 'adresse' => 200, 'commune' => 60, 'offre' => 60, 'notes' => 4000, 'acces' => 1000] as $k => $max) {
         $c[$k] = texte($d[$k] ?? '', $max);
     }
+    // Tout le monde peut dire d'où vient un client ; une valeur hors liste ne s'enregistre pas.
+    $c['venu_par'] = array_key_exists((string) ($d['venu_par'] ?? ''), VENUS_PAR) ? (string) $d['venu_par'] : ($avant['venu_par'] ?? '');
     if ($c['prenom'] === '' && $c['nom'] === '') {
         sortir(200, ['ok' => false, 'erreur' => 'nom']);
     }
@@ -990,7 +992,9 @@ function a_equipe_modifier(): void
         $role = in_array($d['role'] ?? '', ['chef', 'technicien'], true) ? $d['role'] : $role;
         $agence = entier($d['agence_id'] ?? $agence) ?: $agence;
     }
-    $db->prepare('UPDATE utilisateurs SET nom = ?, telephone = ?, courriel = ?, actif = ?, role = ?, agence_id = ? WHERE id = ?')->execute([$nom, $telephone, $courriel, $actif, $role, $agence, $m['id']]);
+    // Le départ se date, pour que le pilotage compte les départs de l'année ; un retour l'efface.
+    $parti = $actif ? null : ((int) $m['actif'] === 1 ? maintenant() : $m['parti_le']);
+    $db->prepare('UPDATE utilisateurs SET nom = ?, telephone = ?, courriel = ?, actif = ?, role = ?, agence_id = ?, parti_le = ? WHERE id = ?')->execute([$nom, $telephone, $courriel, $actif, $role, $agence, $parti, $m['id']]);
     $orphelins = 0;
     if (!$actif || (int) $agence !== (int) $m['agence_id'] || $role !== $m['role']) {
         // Un départ ou un changement de poste ferme ses sessions tout de suite.
@@ -1072,7 +1076,7 @@ function a_equipe_remplacer(): void
     $s->execute([$nouveau_id, maintenant(), $ancien['id']]);
     $secteurs = $s->rowCount();
     if (!empty($d['desactiver'])) {
-        $db->prepare('UPDATE utilisateurs SET actif = 0 WHERE id = ?')->execute([$ancien['id']]);
+        $db->prepare('UPDATE utilisateurs SET actif = 0, parti_le = ? WHERE id = ?')->execute([maintenant(), $ancien['id']]);
         $db->prepare('DELETE FROM sessions WHERE utilisateur_id = ?')->execute([$ancien['id']]);
     }
     $db->commit();

@@ -11,7 +11,7 @@ date_default_timezone_set('Europe/Paris');
 // Un avertissement glissé dans une réponse casse le JSON et peut montrer un chemin du serveur.
 ini_set('display_errors', '0');
 
-const VERSION_SCHEMA = 6;
+const VERSION_SCHEMA = 7;
 const TAILLE_PHOTO_MAX = 4000000;
 const PHOTOS_MAX = 6;
 const EXPEDITEUR = 'contact@maisonflamingo.fr';
@@ -26,6 +26,10 @@ const ROLES_EQUIPE = ['superadmin', 'chef', 'technicien'];
 //   desinscrit : a résilié ; hors tournées, espace client fermé, carnet conservé
 //   perdu      : prospect qui n'a pas signé
 const STATUTS_CLIENT = ['prospect', 'client', 'veille', 'desinscrit', 'perdu'];
+// Comment un client est arrivé. Le voisin et le parrain coûtent presque rien et raccourcissent les tournées :
+// c'est leur part que le pilotage surveille.
+const VENUS_PAR = ['site' => 'Le site', 'voisin' => 'Un voisin client', 'parrainage' => 'Parrainage', 'porte' => 'Porte-à-porte',
+    'apporteur' => 'Un apporteur', 'reseau' => 'Réseau personnel', 'autre' => 'Autre'];
 // Qui voit plusieurs clients, ou toutes les agences, ne se connecte jamais sans second facteur.
 const ROLES_DOUBLE_FACTEUR = ['superadmin', 'chef'];
 // Un technicien ne se reconnecte pas à chaque passage ; un compte qui voit tout, si.
@@ -239,6 +243,14 @@ function migrer(PDO $db): void
         CREATE INDEX IF NOT EXISTS i_evenements ON carnet_evenements(client_id, quand);
         CREATE TABLE IF NOT EXISTS secteurs (id INTEGER PRIMARY KEY, commune TEXT UNIQUE NOT NULL, libelle TEXT NOT NULL, agence_id INTEGER NOT NULL REFERENCES agences(id), technicien_id INTEGER, maj_le TEXT NOT NULL);
         CREATE INDEX IF NOT EXISTS i_leads ON clients(lead_contacte_le, lead_attribue_le);
+    ");
+    // Version 7 : le pilotage. D'où vient un client, quand un membre est parti, et les chiffres du mois
+    // que l'outil ne connaît pas (trésorerie, marge, note Google, ressenti de l'équipe). agence_id = 0 : toute l'entreprise.
+    ajouter_colonne($db, 'clients', 'venu_par', "TEXT NOT NULL DEFAULT ''");
+    ajouter_colonne($db, 'utilisateurs', 'parti_le', 'TEXT');
+    $db->exec("
+        CREATE TABLE IF NOT EXISTS pilotage_saisies (id INTEGER PRIMARY KEY, mois TEXT NOT NULL, agence_id INTEGER NOT NULL DEFAULT 0, cle TEXT NOT NULL,
+            valeur REAL NOT NULL, saisi_par TEXT NOT NULL DEFAULT '', saisi_le TEXT NOT NULL, UNIQUE(mois, agence_id, cle));
     ");
     $version = (int) $db->query('PRAGMA user_version')->fetchColumn();
     $db->beginTransaction();

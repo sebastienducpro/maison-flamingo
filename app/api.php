@@ -14,6 +14,7 @@ require __DIR__ . '/noyau/equipe.php';
 require __DIR__ . '/noyau/espace.php';
 require __DIR__ . '/noyau/carnet.php';
 require __DIR__ . '/noyau/leads.php';
+require __DIR__ . '/noyau/pilotage.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
@@ -34,6 +35,7 @@ const ACTIONS = [
     'carnet', 'carnet_poste', 'carnet_evenement', 'carnet_evenement_supprimer', 'carnet_equipement', 'carnet_equipement_supprimer',
     'carnet_document', 'carnet_document_supprimer', 'document', 'espace_carnet', 'espace_creneau', 'carnet_saison',
     'leads', 'lead_contacte', 'lead_creer', 'secteurs', 'secteur_enregistrer', 'a_faire', 'motdepasse_oublie',
+    'pilotage', 'pilotage_saisie',
 ];
 
 $action = (string) ($_GET['action'] ?? '');

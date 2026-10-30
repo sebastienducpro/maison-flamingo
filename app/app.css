@@ -204,3 +204,26 @@ label.ligne input{width:auto;min-height:auto}
 .visage.petit .initiale{font-size:18px}
 .profil{display:flex;gap:16px;align-items:flex-start}
 .liste li.membre{overflow:hidden}
+
+/* ---------- Pilotage ---------- */
+/* L'état se lit à la couleur ET au mot : jamais la couleur seule. */
+.niveau{display:inline-block;border-radius:999px;padding:2px 10px;font-size:12.5px;font-weight:600;white-space:nowrap}
+.niveau.ok{background:#E3F2EF;color:#174F4A}
+.niveau.attention,.niveau.trop_belle{background:#FDEBD3;color:#7A3B12}
+.niveau.alerte{background:#FBE1DC;color:#7A2418}
+.niveau.a_saisir,.niveau.pas_assez{background:var(--creme-2);color:var(--gris);border:1px solid var(--sable)}
+.kpis.lundi .kpi.niveau-alerte{border-color:var(--rouge);background:#FFF4F1}
+.kpis.lundi .kpi.niveau-attention,.kpis.lundi .kpi.niveau-trop_belle{border-color:var(--orange);background:#FFF6EC}
+.arbitrage{background:var(--violet);color:var(--creme);border-radius:14px;padding:14px 16px;margin:0 0 10px}
+.arbitrage p{margin:6px 0 0;color:#E4DEEE}
+.liste.recos li.reco{padding:14px 16px;background:#fff;border:1px solid var(--sable);border-radius:14px}
+.liste.recos li.reco.alerte{border-color:var(--rouge)}
+.reco-tete{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.reco ol{margin:8px 0;padding-left:22px}
+.reco ol li{margin:4px 0}
+.reco .detail,.reco .qui{font-size:14px;color:var(--gris);margin:6px 0 0}
+table.pilotage .detail{display:block;font-size:13px;color:var(--gris);margin-top:2px}
+table.pilotage td:nth-child(3){min-width:104px}
+table.pilotage td.valeur{white-space:nowrap;font-weight:600;color:var(--violet)}
+.saisie-groupe{border:1px solid var(--sable);border-radius:12px;padding:10px 14px;margin:10px 0;display:grid;gap:10px}
+.saisie-groupe legend{font-weight:600;padding:0 6px}

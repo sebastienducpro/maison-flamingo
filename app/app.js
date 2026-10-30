@@ -152,8 +152,8 @@ function accueilDuRole() {
 
 const MENUS = {
   technicien: [['#/tournee', 'Tournée'], ['#/leads', 'Leads'], ['#/clients', 'Clients'], ['#/demandes', 'Demandes'], ['#/compte', 'Compte']],
-  chef: [['#/tableau', 'Tableau'], ['#/leads', 'Leads'], ['#/tournee', 'Tournées'], ['#/charge', 'Semaine'], ['#/clients', 'Clients'], ['#/secteurs', 'Secteurs'], ['#/equipe', 'Équipe'], ['#/demandes', 'Demandes'], ['#/compte', 'Compte']],
-  superadmin: [['#/tableau', 'Tableau'], ['#/leads', 'Leads'], ['#/tournee', 'Tournées'], ['#/charge', 'Semaine'], ['#/clients', 'Clients'], ['#/secteurs', 'Secteurs'], ['#/equipe', 'Équipe'], ['#/agences', 'Agences'], ['#/demandes', 'Demandes'], ['#/sauvegardes', 'Sauvegardes'], ['#/journal', 'Journal'], ['#/compte', 'Compte']],
+  chef: [['#/tableau', 'Tableau'], ['#/pilotage', 'Pilotage'], ['#/leads', 'Leads'], ['#/tournee', 'Tournées'], ['#/charge', 'Semaine'], ['#/clients', 'Clients'], ['#/secteurs', 'Secteurs'], ['#/equipe', 'Équipe'], ['#/demandes', 'Demandes'], ['#/compte', 'Compte']],
+  superadmin: [['#/tableau', 'Tableau'], ['#/pilotage', 'Pilotage'], ['#/leads', 'Leads'], ['#/tournee', 'Tournées'], ['#/charge', 'Semaine'], ['#/clients', 'Clients'], ['#/secteurs', 'Secteurs'], ['#/equipe', 'Équipe'], ['#/agences', 'Agences'], ['#/demandes', 'Demandes'], ['#/sauvegardes', 'Sauvegardes'], ['#/journal', 'Journal'], ['#/compte', 'Compte']],
 };
 
 // Ce qui attend : un chiffre sur Leads et Demandes, relu toutes les minutes. L'écran rappelle, il ne décide pas.
@@ -197,6 +197,7 @@ async function route() {
       case 'tournee': return await vueTournee(morceaux[1], morceaux[2]);
       case 'charge': return await vueCharge(morceaux[1]);
       case 'tableau': return await vueTableau(morceaux[1]);
+      case 'pilotage': return await vuePilotage(morceaux[1]);
       case 'equipe': return await vueEquipe();
       case 'agences': return await vueAgences();
       case 'demandes': return await vueDemandes();
@@ -273,6 +274,8 @@ function vueConnexion() {
 /* ---------- Les clients ---------- */
 
 const STATUTS = { prospect: 'Prospect', client: 'Actif', veille: 'En veille', desinscrit: 'Désinscrit', perdu: 'Perdu' };
+// Les mêmes clés que VENUS_PAR côté serveur : le pilotage compte la part des voisins et des parrains.
+const VENUS_PAR = { site: 'Le site', voisin: 'Un voisin client', parrainage: 'Parrainage', porte: 'Porte-à-porte', apporteur: 'Un apporteur', reseau: 'Réseau personnel', autre: 'Autre' };
 const AIDE_STATUT = {
   prospect: 'Contact en cours. Pas de passage prévu, mais le diagnostic est possible.',
   client: 'Dans les tournées, espace client ouvert.',
@@ -443,7 +446,8 @@ async function vueClient(id) {
           <label>Jour de passage<select name="jour_passage"><option value="">–</option>${Object.entries(JOURS).map(([k, l]) => `<option value="${k}"${+k === c.jour_passage ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
         </div>
       </fieldset>` : ''}
-      <label>Ce qui l'intéresse<input name="offre" value="${echapper(c.offre)}"></label>
+      <div class="deux"><label>Ce qui l'intéresse<input name="offre" value="${echapper(c.offre)}"></label>
+        <label>Venu par<select name="venu_par"><option value="">–</option>${Object.entries(VENUS_PAR).map(([k, l]) => `<option value="${k}"${k === (c.venu_par || (c.origine === 'site' ? 'site' : '')) ? ' selected' : ''}>${l}</option>`).join('')}</select></label></div>
       <label>Notes<textarea name="notes" rows="4">${echapper(c.notes)}</textarea></label>
       <button class="principal">${nouveau ? 'Créer la fiche' : 'Enregistrer la fiche'}</button>
       <p class="message" id="m" role="status"></p>
