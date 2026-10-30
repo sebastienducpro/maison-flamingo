@@ -333,7 +333,7 @@ async function vueAgences() {
       <button class="${a.id ? 'secondaire' : 'principal'}">${a.id ? 'Enregistrer' : 'Créer l\'agence'}</button>
       <p class="message" role="status"></p>
     </form>`;
-  vue().innerHTML = `<h1>Agences</h1><p><a href="#/societe">La société et ses contrats →</a> · <a href="#/facturation">Facturation et prélèvements →</a></p>${d.agences.map(formulaire).join('')}${formulaire()}`;
+  vue().innerHTML = `<h1>Agences</h1><p><a href="#/societe">Les sociétés, la grille et les contrats →</a> · <a href="#/facturation">Facturation et prélèvements →</a></p>${d.agences.map(formulaire).join('')}${formulaire()}`;
   vue().querySelectorAll('form.agence').forEach((f) => f.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const corps = Object.fromEntries(new FormData(f).entries());
@@ -389,8 +389,8 @@ async function vueCorbeille() {
   const enCours = d.elements.filter((k) => !k.remis_le);
   vue().innerHTML = `<h1>Corbeille <span class="aide">${d.jours} derniers jours</span></h1>
     <p class="aide">Ce qu'on efface dans le carnet, et l'ancienne version de ce qu'on réécrit dans une fiche client ou le carnet, arrive ici avec qui l'a fait et quand. Le remettre ne touche à rien d'autre ; et la version qu'on écarte en le remettant revient ici à son tour. Après ${d.jours} jours, la corbeille se vide.</p>
-    ${enCours.length ? `<ul class="liste">${enCours.map((k) => `<li class="membre"><div class="reco-tete"><strong>${echapper(k.quoi)}</strong> <span>${echapper(k.libelle)} · <a href="#/client/${k.client_id}">${echapper(k.client)}</a></span>${pastilleDe(k.nature === 'efface' ? ['rouge', 'Effacé'] : ['orange', 'Remplacé'])}</div>
-      <span class="sous">${echapper(k.qui)} · ${echapper(dateFr(k.quand))}</span>
+    ${enCours.length ? `<ul class="liste">${enCours.map((k) => `<li class="membre"><div class="reco-tete"><strong>${echapper(k.quoi)}</strong> <span>${echapper(k.libelle)}</span>${pastilleDe(k.nature === 'efface' ? ['rouge', 'Effacé'] : ['orange', 'Remplacé'])}</div>
+      <span class="sous">Client : ${echapper(k.client)} · retiré par ${echapper(k.qui)} · ${echapper(dateFr(k.quand))}</span>
       ${k.ecarts.length ? `<ul class="ecarts">${k.ecarts.map((e) => `<li><strong>${echapper(e.champ)}</strong> : avant ${echapper(court(e.avant))}${e.maintenant !== null ? ', aujourd\'hui ' + echapper(court(e.maintenant)) : ''}</li>`).join('')}</ul>` : ''}
       <div class="actions-ligne"><button class="secondaire" data-remettre="${k.id}">${k.nature === 'efface' ? 'Le remettre' : 'Remettre cette version'}</button></div><p class="message" role="status"></p></li>`).join('')}</ul>`
       : '<p class="aide">Rien dans la corbeille.</p>'}
