@@ -11,7 +11,7 @@ date_default_timezone_set('Europe/Paris');
 // Un avertissement glissé dans une réponse casse le JSON et peut montrer un chemin du serveur.
 ini_set('display_errors', '0');
 
-const VERSION_SCHEMA = 8;
+const VERSION_SCHEMA = 9;
 const TAILLE_PHOTO_MAX = 4000000;
 const PHOTOS_MAX = 6;
 const EXPEDITEUR = 'contact@maisonflamingo.fr';
@@ -282,6 +282,21 @@ function migrer(PDO $db): void
             telephone TEXT NOT NULL DEFAULT '', courriel TEXT NOT NULL DEFAULT '', source TEXT NOT NULL DEFAULT '', disponibilites TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '',
             entretien INTEGER NOT NULL DEFAULT 0, casier INTEGER NOT NULL DEFAULT 0, permis INTEGER NOT NULL DEFAULT 0, essai INTEGER NOT NULL DEFAULT 0,
             securite INTEGER NOT NULL DEFAULT 0, cles INTEGER NOT NULL DEFAULT 0, ecarte INTEGER NOT NULL DEFAULT 0, utilisateur_id INTEGER, cree_le TEXT NOT NULL, maj_le TEXT NOT NULL);
+    ");
+    // Version 9 : la fiche du technicien (date d'entrée, contact d'urgence, tailles de tenue), ses habilitations et formations
+    // avec leur échéance, et ses demandes de congés, qui deviennent des absences une fois acceptées.
+    foreach (['entree_le' => 'TEXT', 'urgence_nom' => "TEXT NOT NULL DEFAULT ''", 'urgence_tel' => "TEXT NOT NULL DEFAULT ''",
+        'taille_haut' => "TEXT NOT NULL DEFAULT ''", 'taille_bas' => "TEXT NOT NULL DEFAULT ''", 'pointure' => "TEXT NOT NULL DEFAULT ''"] as $c => $def) {
+        ajouter_colonne($db, 'utilisateurs', $c, $def);
+    }
+    $db->exec("
+        CREATE TABLE IF NOT EXISTS qualifications (id INTEGER PRIMARY KEY, utilisateur_id INTEGER NOT NULL REFERENCES utilisateurs(id), type TEXT NOT NULL,
+            intitule TEXT NOT NULL DEFAULT '', obtenue_le TEXT, expire_le TEXT, note TEXT NOT NULL DEFAULT '', cree_par TEXT NOT NULL DEFAULT '', maj_le TEXT NOT NULL);
+        CREATE INDEX IF NOT EXISTS i_qualifications ON qualifications(utilisateur_id, expire_le);
+        CREATE TABLE IF NOT EXISTS demandes_conges (id INTEGER PRIMARY KEY, utilisateur_id INTEGER NOT NULL REFERENCES utilisateurs(id), du TEXT NOT NULL, au TEXT NOT NULL,
+            motif TEXT NOT NULL DEFAULT 'Congés', message TEXT NOT NULL DEFAULT '', statut TEXT NOT NULL DEFAULT 'attente', reponse TEXT NOT NULL DEFAULT '',
+            decide_par TEXT NOT NULL DEFAULT '', decide_le TEXT, absence_id INTEGER, cree_le TEXT NOT NULL);
+        CREATE INDEX IF NOT EXISTS i_conges ON demandes_conges(statut, utilisateur_id);
     ");
     $version = (int) $db->query('PRAGMA user_version')->fetchColumn();
     $db->beginTransaction();

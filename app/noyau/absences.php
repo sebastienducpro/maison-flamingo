@@ -115,6 +115,8 @@ function a_absence_supprimer(): void
         sortir(404, ['ok' => false, 'erreur' => 'absence']);
     }
     base()->prepare('DELETE FROM absences WHERE id = ?')->execute([$a['id']]);
+    // Une absence née d'une demande de congés acceptée : la demande le dit, pour que le technicien ne croie pas partir.
+    base()->prepare("UPDATE demandes_conges SET statut = 'annulee', reponse = CASE WHEN reponse = '' THEN 'Absence retirée par le responsable.' ELSE reponse END WHERE absence_id = ?")->execute([$a['id']]);
     tracer($u, 'absence retirée', "{$a['utilisateur_id']} {$a['du']} → {$a['au']}");
     sortir(200, ['ok' => true]);
 }

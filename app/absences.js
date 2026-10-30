@@ -8,7 +8,7 @@ const STATUTS_VIVIER = {
 };
 const COULEUR_VIVIER = { a_rencontrer: 'orange', en_verification: 'orange', pret: 'vert', en_mission: 'vert', ecarte: 'rouge' };
 
-const ongletsAbsences = (ici) => `<nav class="jours onglets"><a href="#/absences"${ici === 'absences' ? ' aria-current="page"' : ''}>Absences</a><a href="#/vivier"${ici === 'vivier' ? ' aria-current="page"' : ''}>Vivier</a></nav>`;
+const ongletsAbsences = (ici) => `<nav class="jours onglets">${[['absences', 'Absences'], ['conges', 'Congés' + (A_FAIRE.conges ? ' (' + A_FAIRE.conges + ')' : '')], ['vivier', 'Vivier']].map(([h, l]) => `<a href="#/${h}"${ici === h ? ' aria-current="page"' : ''}>${l}</a>`).join('')}</nav>`;
 const choixAgence = (d) => (d.agences && d.agences.length ? `<select id="agence" aria-label="Agence"><option value="">Toutes les agences</option>${d.agences.map((a) => `<option value="${a.id}"${a.id === d.agence ? ' selected' : ''}>${echapper(a.nom)}</option>`).join('')}</select>` : '');
 const dateCourte = (iso) => dateFr(iso + 'T12:00:00', false);
 // La date locale, pas celle de Greenwich : à 0 h 30 à Nîmes, toISOString dirait encore hier.

@@ -120,6 +120,25 @@ const RECOMMANDATIONS = [
         'attention' => ['Un seul remplaçant prêt dans une agence', 'agence', [
             'Compléter le vivier avant l\'été et les congés : il en faut deux pour qu\'une absence n\'en devienne pas deux.']],
     ],
+    'echeances' => [
+        'alerte' => ['Une habilitation a expiré', 'agence', [
+            'Ne plus confier à la personne ce que l\'habilitation couvre, le temps du recyclage.',
+            'L\'inscrire au prochain recyclage cette semaine, et poser la nouvelle date sur sa fiche dès qu\'elle est connue.',
+            'Pour le permis : pas de conduite du véhicule de l\'entreprise tant qu\'il n\'est pas régularisé.']],
+        'attention' => ['Des habilitations arrivent à échéance dans le mois', 'agence', [
+            'Inscrire maintenant chaque personne concernée au recyclage : les sessions se remplissent vite.',
+            'Poser la journée de formation comme une absence, pour couvrir sa tournée à l\'avance.']],
+        'a_saisir' => ['Aucune habilitation n\'est enregistrée', 'agence', [
+            'Poser au moins le permis de chaque technicien sur sa fiche, avec sa date de fin s\'il en a une.',
+            'Ajouter ensuite les formations suivies : c\'est ce qui permettra de prévenir avant qu\'elles ne tombent.']],
+    ],
+    'conges_attente' => [
+        'alerte' => ['Une demande de congés attend depuis plus de cinq jours', 'chef', [
+            'Répondre aujourd\'hui depuis Absences, onglet Congés : oui, ou non avec la raison et d\'autres dates possibles.',
+            'Une demande sans réponse coûte plus de confiance qu\'un refus expliqué.']],
+        'attention' => ['Des demandes de congés attendent une réponse', 'chef', [
+            'Les décider dans la semaine, en regardant les journées de tournée touchées et qui d\'autre est déjà absent.']],
+    ],
     'passages_courts' => [
         'alerte' => ['Trop de passages durent moins de 20 minutes', 'chef', [
             'Accompagner cette semaine les tournées concernées, sans prévenir et sans juger.',
@@ -405,6 +424,33 @@ function a_pilotage(): void
         $ind[] = indicateur('vivier', 'Remplaçants prêts dans le vivier', $min . ($agence ? '' : ' au moins'), 'deux par agence', $min === 0 ? 'alerte' : ($min < 2 ? 'attention' : 'ok'), 'agence',
             implode(', ', array_map(fn ($r) => $r['nom'] . ' : ' . (int) $r['prets'], $agences_vivier)));
     }
+
+    // Les échéances : une habilitation qui tombe sans qu'on l'ait vue venir, c'est une tournée qu'on ne peut plus confier.
+    $ech_membres = "u.actif = 1 AND u.hash <> '' AND u.role IN ('technicien', 'chef') AND (u.expire_le IS NULL OR u.expire_le >= '" . date('Y-m-d') . "')" . ($agence ? ' AND u.agence_id = ?' : '');
+    $pag = $agence ? [$agence] : [];
+    $ech = $db->prepare("SELECT u.nom, q.type, q.intitule, q.expire_le FROM qualifications q JOIN utilisateurs u ON u.id = q.utilisateur_id WHERE $ech_membres AND q.expire_le IS NOT NULL
+        AND q.expire_le <= ? ORDER BY q.expire_le");
+    $ech->execute([...$pag, date('Y-m-d', strtotime('+' . ECHEANCE_PROCHE_JOURS . ' days'))]);
+    $ech_proches = $ech->fetchAll();
+    $ech_expirees = array_values(array_filter($ech_proches, fn ($x) => $x['expire_le'] < date('Y-m-d')));
+    $nq = $db->prepare("SELECT COUNT(DISTINCT u.id), (SELECT COUNT(*) FROM qualifications q JOIN utilisateurs u ON u.id = q.utilisateur_id WHERE $ech_membres) FROM utilisateurs u WHERE $ech_membres");
+    $nq->execute([...$pag, ...$pag]);
+    [$nb_membres, $nb_qualifs] = array_map('intval', $nq->fetch(PDO::FETCH_NUM));
+    $ech_nommer = fn ($l) => implode(', ', array_map(fn ($x) => $x['nom'] . ' : ' . (QUALIFICATIONS[$x['type']] ?? $x['type']) . ($x['intitule'] ? ' (' . $x['intitule'] . ')' : '') . ' au ' . date('d/m', strtotime($x['expire_le'])), array_slice($l, 0, 5))) . '.';
+    $ind[] = !$nb_membres
+        ? indicateur('echeances', 'Habilitations expirées ou à échéance dans le mois', null, 'aucune', 'pas_assez', 'agence', 'Pas encore d\'équipe.')
+        : (!$nb_qualifs
+            ? indicateur('echeances', 'Habilitations expirées ou à échéance dans le mois', null, 'aucune', 'a_saisir', 'agence', 'Aucune habilitation enregistrée sur les fiches.')
+            : indicateur('echeances', 'Habilitations expirées ou à échéance dans le mois', (string) count($ech_proches), 'aucune', $ech_expirees ? 'alerte' : ($ech_proches ? 'attention' : 'ok'), 'agence',
+                $ech_proches ? $ech_nommer($ech_expirees ?: $ech_proches) : 'Toutes les habilitations enregistrées sont valables au-delà d\'un mois.'));
+
+    // Les congés demandés : une réponse dans les cinq jours, oui ou non avec la raison.
+    $cgq = $db->prepare("SELECT u.nom, d.du, d.cree_le FROM demandes_conges d JOIN utilisateurs u ON u.id = d.utilisateur_id WHERE d.statut = 'attente'" . ($agence ? ' AND u.agence_id = ?' : '') . ' ORDER BY d.cree_le');
+    $cgq->execute($pag);
+    $cg_attente = $cgq->fetchAll();
+    $cg_vieilles = array_values(array_filter($cg_attente, fn ($x) => strtotime($x['cree_le']) < time() - CONGE_REPONSE_JOURS * 86400));
+    $ind[] = indicateur('conges_attente', 'Demandes de congés sans réponse', (string) count($cg_attente), 'réponse sous ' . CONGE_REPONSE_JOURS . ' jours', $cg_vieilles ? 'alerte' : ($cg_attente ? 'attention' : 'ok'), 'chef',
+        $cg_attente ? implode(', ', array_map(fn ($x) => $x['nom'] . ' (pour le ' . date('d/m', strtotime($x['du'])) . ', demandé le ' . date('d/m', strtotime($x['cree_le'])) . ')', array_slice($cg_attente, 0, 5))) . '.' : 'Aucune demande en attente.');
 
     [$mesures, $courts, $duree] = $un("SELECT COUNT(*), SUM(v.duree_min < ?), AVG(v.duree_min) FROM visites v JOIN clients c ON c.id = v.client_id
         WHERE $w AND v.type = 'passage' AND v.duree_min IS NOT NULL AND v.quand >= ?", [PASSAGE_COURT_MIN, ...$p, $il_y_a(30)]);

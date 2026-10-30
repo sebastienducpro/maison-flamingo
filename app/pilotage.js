@@ -9,7 +9,7 @@ const NIVEAUX = {
 };
 const FAMILLES = [
   ['Les clients', ['resiliations', 'rapports', 'jour_prevu', 'demandes', 'leads', 'note_google']],
-  ['L\'équipe', ['remplissage', 'journees', 'couverture', 'vivier', 'passages_courts', 'departs', 'score_equipe', 'prime']],
+  ['L\'équipe', ['remplissage', 'journees', 'couverture', 'vivier', 'conges_attente', 'echeances', 'passages_courts', 'departs', 'score_equipe', 'prime']],
   ['L\'argent', ['tresorerie', 'ebitda', 'contribution', 'produits', 'prelevements']],
   ['La croissance', ['conversion', 'voisins']],
 ];

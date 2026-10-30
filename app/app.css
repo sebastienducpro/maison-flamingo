@@ -241,3 +241,9 @@ label.case{flex-direction:row;align-items:center;gap:10px;min-height:44px;margin
 .fiche-vivier{display:grid;gap:10px;margin-top:12px}
 .mission{border-top:1px solid var(--sable);padding-top:12px;display:grid;gap:10px}
 .jour-absent{background:#ECE7F2;color:var(--gris)}
+
+/* Fiche du technicien : trois tailles sur une ligne, et le lien du compte vers la fiche. */
+.trois-champs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+a.lien-fiche{display:grid;gap:4px;text-decoration:none;color:var(--encre);margin-bottom:12px}
+a.lien-fiche strong::after{content:' →'}
+.pastille:not(.vert):not(.orange):not(.rouge){background:#EEE;color:var(--gris)}

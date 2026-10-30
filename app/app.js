@@ -157,7 +157,7 @@ const MENUS = {
 };
 
 // Ce qui attend : un chiffre sur Leads et Demandes, relu toutes les minutes. L'écran rappelle, il ne décide pas.
-const A_FAIRE = { leads: 0, leads_retard: 0, demandes: 0 };
+const A_FAIRE = { leads: 0, leads_retard: 0, demandes: 0, conges: 0 };
 async function majAFaire() {
   if (!APP.utilisateur || !navigator.onLine) return;
   try {
@@ -174,8 +174,8 @@ function dessinerNav() {
   nav.hidden = !menu.length;
   // Le vivier est un onglet des absences : le menu reste court, l'onglet reste allumé.
   const tete = location.hash.slice(2).split('/')[0] || '';
-  const ici = '#/' + (tete === 'vivier' ? 'absences' : tete);
-  const badge = (h) => (h === '#/leads' && A_FAIRE.leads ? `<span class="badge${A_FAIRE.leads_retard ? ' retard' : ''}">${A_FAIRE.leads}</span>` : h === '#/demandes' && A_FAIRE.demandes ? `<span class="badge">${A_FAIRE.demandes}</span>` : '');
+  const ici = '#/' + (tete === 'vivier' || tete === 'conges' ? 'absences' : tete);
+  const badge = (h) => (h === '#/leads' && A_FAIRE.leads ? `<span class="badge${A_FAIRE.leads_retard ? ' retard' : ''}">${A_FAIRE.leads}</span>` : h === '#/demandes' && A_FAIRE.demandes ? `<span class="badge">${A_FAIRE.demandes}</span>` : h === '#/absences' && A_FAIRE.conges ? `<span class="badge">${A_FAIRE.conges}</span>` : '');
   nav.innerHTML = menu.map(([h, l]) => `<a href="${h}"${h === ici ? ' aria-current="page"' : ''}>${l}${badge(h)}</a>`).join('');
 }
 
@@ -202,6 +202,8 @@ async function route() {
       case 'pilotage': return await vuePilotage(morceaux[1]);
       case 'absences': return await vueAbsences(morceaux[1]);
       case 'vivier': return await vueVivier(morceaux[1]);
+      case 'conges': return await vueConges(morceaux[1]);
+      case 'fiche': return await vueFiche(morceaux[1]);
       case 'equipe': return await vueEquipe();
       case 'agences': return await vueAgences();
       case 'demandes': return await vueDemandes();

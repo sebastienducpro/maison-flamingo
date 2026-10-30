@@ -243,12 +243,18 @@ function a_a_faire(): void
     $d = $db->prepare("SELECT COUNT(*) FROM demandes d JOIN clients c ON c.id = d.client_id WHERE ($w) AND d.traitee_le IS NULL");
     $d->execute($p);
     $sans = 0;
+    $conges = 0;
     if ($u['role'] !== 'technicien') {
+        // Les demandes de congés à décider : un chiffre sur Absences, comme sur Leads et Demandes.
+        $cg = $db->prepare("SELECT COUNT(*) FROM demandes_conges d JOIN utilisateurs m ON m.id = d.utilisateur_id WHERE d.statut = 'attente' AND "
+            . ($u['role'] === 'chef' ? "m.role = 'technicien' AND m.agence_id = ?" : "m.id <> ?"));
+        $cg->execute([$u['role'] === 'chef' ? (int) $u['agence_id'] : (int) $u['id']]);
+        $conges = (int) $cg->fetchColumn();
         $s = $db->prepare("SELECT COUNT(*) FROM clients c WHERE ($w) AND c.lead_recu_le IS NOT NULL AND c.lead_contacte_le IS NULL AND c.technicien_id IS NULL");
         $s->execute($p);
         $sans = (int) $s->fetchColumn();
     }
-    sortir(200, ['ok' => true, 'leads' => (int) $leads, 'leads_retard' => (int) $retard, 'leads_sans_technicien' => $sans, 'demandes' => (int) $d->fetchColumn()]);
+    sortir(200, ['ok' => true, 'leads' => (int) $leads, 'leads_retard' => (int) $retard, 'leads_sans_technicien' => $sans, 'demandes' => (int) $d->fetchColumn(), 'conges' => $conges]);
 }
 
 // Les indicateurs de réponse : par technicien dans une agence, par agence pour la direction. Trente jours glissants.

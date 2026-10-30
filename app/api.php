@@ -16,6 +16,7 @@ require __DIR__ . '/noyau/carnet.php';
 require __DIR__ . '/noyau/leads.php';
 require __DIR__ . '/noyau/pilotage.php';
 require __DIR__ . '/noyau/absences.php';
+require __DIR__ . '/noyau/personnel.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
@@ -39,6 +40,7 @@ const ACTIONS = [
     'pilotage', 'pilotage_saisie',
     'absences', 'absence_enregistrer', 'absence_supprimer', 'remplacement_poser', 'remplacement_retirer',
     'vivier', 'vivier_enregistrer', 'vivier_activer', 'vivier_terminer',
+    'fiche', 'fiche_enregistrer', 'qualification_enregistrer', 'qualification_supprimer', 'conges', 'conge_demander', 'conge_annuler', 'conge_decider',
 ];
 
 $action = (string) ($_GET['action'] ?? '');

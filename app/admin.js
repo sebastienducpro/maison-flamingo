@@ -98,6 +98,7 @@ async function vueCompte() {
       <label class="bouton secondaire fichier">${u.photo ? 'Changer ma photo' : 'Ajouter ma photo'}<input id="ma-photo" type="file" accept="image/*" capture="user" hidden></label>
       <p class="message" id="m-photo" role="status"></p></div>
     </section>
+    <a class="carte lien-fiche" href="#/fiche"><strong>Ma fiche et mes congés</strong><span class="sous">Habilitations, demandes de congés, contact d'urgence, tailles de tenue</span></a>
     <form id="f-tel" class="carte">
       <label>Mon téléphone, vu par les clients<input name="telephone" type="tel" value="${echapper(u.telephone || '')}" placeholder="06 00 00 00 00"></label>
       <button class="secondaire">Enregistrer</button>
@@ -219,6 +220,7 @@ async function vueEquipe() {
       <div><span class="nom">${echapper(m.nom)}</span> <span class="sous">${m.remplacant_jusquau ? (m.remplacant_jusquau >= new Date().toLocaleDateString('sv-SE') ? 'Remplaçant du vivier jusqu\'au ' + echapper(dateFr(m.remplacant_jusquau + 'T12:00:00', false)) : 'Remplaçant du vivier, mission finie') : roles[m.role]}${m.agence ? ' · ' + echapper(m.agence) : ''}${m.role === 'technicien' && !m.remplacant_jusquau ? ' · ' + m.clients + ' client' + (m.clients > 1 ? 's' : '') + (m.secteurs ? ' · ' + m.secteurs + ' secteur' + (m.secteurs > 1 ? 's' : '') : '') : ''}</span></div>
       <span class="sous">${echapper(m.courriel)}${m.telephone ? ' · ' + echapper(m.telephone) : ''} · ${!m.actif ? 'désactivé' : m.en_attente ? 'invitation en attente' : m.derniere_connexion ? 'vu le ' + echapper(dateFr(m.derniere_connexion, false)) : 'jamais connecté'}${m.double_facteur ? ' · second facteur' : ''}</span>
       ${m.id !== APP.utilisateur.id && m.role !== 'superadmin' && (sa || m.role === 'technicien') ? `<div class="actions-ligne">
+        <a class="bouton discret" href="#/fiche/${m.id}">Fiche</a>
         <button class="discret" data-modifier="${m.id}">Coordonnées</button>
         <button class="secondaire" data-lien="${m.id}">Nouveau lien d'accès</button>
         ${m.double_facteur ? `<button class="discret" data-facteur="${m.id}">Téléphone perdu</button>` : ''}
