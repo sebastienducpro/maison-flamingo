@@ -8,7 +8,7 @@
 // Le contrat, lui, est toujours chiffré par le serveur.
 const TARIFS = {
   piscine:          { libelle: 'Piscine', prix: 179, fondateur: 149, piscine: true, detail: 'Chaque semaine d\'avril à octobre, produits, remise en route et hivernage compris' },
-  quinzaine:        { libelle: 'Piscine équipée, quinzaine hors été', prix: null, fondateur: null, piscine: true, detail: 'Chaque semaine l\'été, tous les quinze jours le reste de la saison, pour un bassin équipé d\'un traitement automatique et d\'une régulation du pH' },
+  quinzaine:        { libelle: 'Piscine équipée, quinzaine hors été', prix: 149, fondateur: 125, piscine: true, detail: 'Chaque semaine l\'été, tous les quinze jours le reste de la saison, pour un bassin équipé d\'un traitement automatique et d\'une régulation du pH' },
   pack:             { libelle: 'Piscine + Maison', pack: ['piscine', 'maison'], piscine: true, detail: 'La piscine chaque semaine, et le jardin, le petit bricolage et la vigilance de la maison' },
   maison:           { libelle: 'Maison', prix: 45, fondateur: 45, piscine: false, detail: 'Petits travaux de jardinage, petit bricolage et vigilance de la maison, surtout d\'automne au printemps' },
   maison_renforcee: { libelle: 'Maison renforcée', prix: 100, fondateur: 100, piscine: false, detail: 'Environ deux heures d\'intervention chaque mois : jardin, petit bricolage, vigilance' },

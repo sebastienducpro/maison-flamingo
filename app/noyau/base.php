@@ -46,7 +46,7 @@ const DUREE_DEFAUT = ['passage' => 30, 'diagnostic' => 60];
 // personne, qui exigent une activité exclusive. Une piscine ne se facture jamais par la société Maison.
 const FORMULES = [
     'Piscine' => ['cle' => 'piscine', 'societe' => 'piscine', 'engagement' => 12, 'piscine' => true, 'prix' => 179, 'fondateur' => 149, 'duree' => 30, 'part' => 1],
-    'Piscine équipée, quinzaine hors été' => ['cle' => 'quinzaine', 'societe' => 'piscine', 'engagement' => 12, 'piscine' => true, 'prix' => null, 'fondateur' => null, 'duree' => 30, 'part' => 1],
+    'Piscine équipée, quinzaine hors été' => ['cle' => 'quinzaine', 'societe' => 'piscine', 'engagement' => 12, 'piscine' => true, 'prix' => 149, 'fondateur' => 125, 'duree' => 30, 'part' => 1],
     'Maison' => ['cle' => 'maison', 'societe' => 'maison', 'engagement' => 0, 'piscine' => false, 'prix' => 45, 'fondateur' => 45, 'duree' => 60, 'part' => 0.25],
     'Maison renforcée' => ['cle' => 'maison_renforcee', 'societe' => 'maison', 'engagement' => 0, 'piscine' => false, 'prix' => 100, 'fondateur' => 100, 'duree' => 120, 'part' => 0.25],
     'Veille de résidence' => ['cle' => 'veille', 'societe' => 'maison', 'engagement' => 0, 'piscine' => false, 'prix' => 49, 'fondateur' => 49, 'duree' => 20, 'part' => 0.25],
