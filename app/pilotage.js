@@ -8,9 +8,9 @@ const NIVEAUX = {
   a_saisir: 'À saisir', pas_assez: 'Pas encore assez de données',
 };
 const FAMILLES = [
-  ['Les clients', ['resiliations', 'rapports', 'jour_prevu', 'demandes', 'leads', 'note_google']],
+  ['Les clients', ['resiliations', 'rapports', 'jour_prevu', 'demandes', 'contrats', 'leads', 'note_google']],
   ['L\'équipe', ['remplissage', 'journees', 'couverture', 'vivier', 'conges_attente', 'echeances', 'passages_courts', 'departs', 'score_equipe', 'prime']],
-  ['L\'argent', ['tresorerie', 'ebitda', 'contribution', 'produits', 'prelevements']],
+  ['L\'argent', ['tresorerie', 'impayes', 'ebitda', 'contribution', 'produits', 'prelevements']],
   ['La croissance', ['conversion', 'voisins']],
 ];
 
@@ -57,7 +57,14 @@ async function vuePilotage(agence) {
       <p class="aide">Un champ vidé efface la saisie de ce mois. Les bornes refusent une faute de frappe, jamais une mauvaise nouvelle.</p>
       <button class="principal">Enregistrer la saisie</button>
       <p class="message" id="saisie-m" role="status"></p>
-    </form>`;
+    </form>
+    <h2>Le relevé du lundi <span class="aide">${d.direction ? 'toute l\'entreprise et les sauvegardes' : 'votre agence'}, chaque lundi au réveil</span></h2>
+    <section class="carte">
+      <label class="case"><input type="checkbox" id="releve"${d.releve_lundi ? ' checked' : ''}> Recevoir le relevé chaque lundi par courriel</label>
+      <p class="aide">Les chiffres du lundi, ce qu'il y a à faire et qui agit. L'écran reste la référence : un courriel peut se perdre ou arriver dans les indésirables.</p>
+      <button class="secondaire" id="releve-essai">M'envoyer le relevé maintenant</button>
+      <p class="message" id="releve-m" role="status"></p>
+    </section>`;
   const sel = document.getElementById('agence');
   if (sel) sel.addEventListener('change', () => aller(sel.value ? '#/pilotage/' + sel.value : '#/pilotage'));
 
@@ -83,6 +90,17 @@ async function vuePilotage(agence) {
   };
   dessinerChamps();
   if (choixAgence) choixAgence.addEventListener('change', dessinerChamps);
+  const m2 = document.getElementById('releve-m');
+  document.getElementById('releve').addEventListener('change', async (e) => {
+    const r = await api('releve_preference', { methode: 'POST', corps: { recevoir: e.target.checked } });
+    m2.textContent = r.ok ? (r.recevoir ? 'Vous le recevrez chaque lundi.' : 'Vous ne le recevrez plus.') : 'Le réglage n\'a pas été enregistré.';
+  });
+  document.getElementById('releve-essai').addEventListener('click', async (e) => {
+    e.target.disabled = true;
+    const r = await api('releve_essai', { methode: 'POST', corps: {} });
+    m2.textContent = r.ok ? 'Parti vers ' + r.courriel + '. Vérifiez la boîte de réception, et les indésirables.' : 'Le courriel n\'est pas parti : l\'envoi depuis l\'hébergement ne répond pas.';
+    e.target.disabled = false;
+  });
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const m = document.getElementById('saisie-m');

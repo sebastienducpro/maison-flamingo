@@ -132,6 +132,19 @@ const RECOMMANDATIONS = [
             'Poser au moins le permis de chaque technicien sur sa fiche, avec sa date de fin s\'il en a une.',
             'Ajouter ensuite les formations suivies : c\'est ce qui permettra de prévenir avant qu\'elles ne tombent.']],
     ],
+    'contrats' => [
+        'alerte' => ['Un client n\'a pas été prévenu de la reconduction de son contrat', 'agence', [
+            'Lui écrire aujourd\'hui : la date d\'échéance, et sa liberté de ne pas reconduire (article L215-1).',
+            'Noter le rappel sur sa fiche, rubrique Contrat : sans preuve d\'envoi, le client peut résilier à tout moment après l\'échéance.']],
+        'attention' => ['Des reconductions approchent', 'agence', [
+            'Envoyer le rappel écrit à chaque client concerné, entre trois mois et un mois avant l\'échéance, puis le noter sur sa fiche.']],
+    ],
+    'impayes' => [
+        'alerte' => ['Des prélèvements ont été rejetés', 'direction', [
+            'Appeler chaque client concerné cette semaine : un rejet est souvent un changement de banque, rarement un refus.',
+            'Lui renvoyer le lien de mandat depuis son espace si son compte a changé, puis relancer le prélèvement.',
+            'Au deuxième rejet sans réponse, passer la formule en veille plutôt que de continuer à passer.']],
+    ],
     'conges_attente' => [
         'alerte' => ['Une demande de congés attend depuis plus de cinq jours', 'chef', [
             'Répondre aujourd\'hui depuis Absences, onglet Congés : oui, ou non avec la raison et d\'autres dates possibles.',
@@ -295,7 +308,12 @@ function garder_releve(string $cle, ?int $agence, float $valeur): ?float
 function a_pilotage(): void
 {
     $u = exiger_equipe(['chef', 'superadmin']);
-    $agence = agence_visee($u);
+    sortir(200, calculer_pilotage($u, agence_visee($u)));
+}
+
+// Le calcul, séparé de la requête : le relevé du lundi le refait pour chaque destinataire, avec ses droits à lui.
+function calculer_pilotage(array $u, ?int $agence): array
+{
     $direction = $u['role'] === 'superadmin';
     $db = base();
     $w = $agence ? 'c.agence_id = ?' : '1=1';
@@ -444,6 +462,25 @@ function a_pilotage(): void
             : indicateur('echeances', 'Habilitations expirées ou à échéance dans le mois', (string) count($ech_proches), 'aucune', $ech_expirees ? 'alerte' : ($ech_proches ? 'attention' : 'ok'), 'agence',
                 $ech_proches ? $ech_nommer($ech_expirees ?: $ech_proches) : 'Toutes les habilitations enregistrées sont valables au-delà d\'un mois.'));
 
+    // Les reconductions : un client engagé pour une saison doit être prévenu par écrit avant chaque échéance.
+    $rap = rappels_reconduction($agence);
+    $rap_retard = array_values(array_filter($rap, fn ($x) => $x['en_retard']));
+    $nb_contrats = (int) $db->query("SELECT COUNT(*) FROM contrats WHERE statut = 'signe'")->fetchColumn();
+    $ind[] = !$nb_contrats
+        ? indicateur('contrats', 'Rappels de reconduction à envoyer', null, 'aucun en retard', 'pas_assez', 'agence', 'Aucun contrat signé pour l\'instant.')
+        : indicateur('contrats', 'Rappels de reconduction à envoyer', (string) count($rap), 'aucun en retard', $rap_retard ? 'alerte' : ($rap ? 'attention' : 'ok'), 'agence',
+            $rap ? implode(', ', array_map(fn ($x) => $x['client'] . ' (' . $x['numero'] . ', échéance le ' . date('d/m', strtotime($x['echeance'])) . ')', array_slice($rap, 0, 5))) . '.' : 'Aucune reconduction dans les trois mois sans rappel envoyé.');
+
+    // Les impayés : un prélèvement rejeté se traite dans la semaine, sinon il devient un client qu'on sert sans être payé.
+    if ($direction) {
+        $imp = $db->query("SELECT COUNT(*), COALESCE(SUM(montant), 0) FROM factures WHERE statut = 'rejetee'")->fetch(PDO::FETCH_NUM);
+        $nb_factures = (int) $db->query('SELECT COUNT(*) FROM factures')->fetchColumn();
+        $ind[] = !$nb_factures
+            ? indicateur('impayes', 'Prélèvements rejetés non régularisés', null, 'aucun', 'pas_assez', 'direction', 'Aucune facture émise pour l\'instant.')
+            : indicateur('impayes', 'Prélèvements rejetés non régularisés', (string) (int) $imp[0], 'aucun', (int) $imp[0] > 0 ? 'alerte' : 'ok', 'direction',
+                (int) $imp[0] ? number_format((int) $imp[1] / 100, 2, ',', ' ') . ' € en attente' : 'Tout ce qui a été prélevé est payé ou en cours.');
+    }
+
     // Les congés demandés : une réponse dans les cinq jours, oui ou non avec la raison.
     $cgq = $db->prepare("SELECT u.nom, d.du, d.cree_le FROM demandes_conges d JOIN utilisateurs u ON u.id = d.utilisateur_id WHERE d.statut = 'attente'" . ($agence ? ' AND u.agence_id = ?' : '') . ' ORDER BY d.cree_le');
     $cgq->execute($pag);
@@ -585,12 +622,13 @@ function a_pilotage(): void
         }
         $champs[] = ['cle' => $cle, 'portee' => $s['portee'], 'libelle' => $s['libelle'], 'unite' => $s['unite'], 'frequence' => $s['frequence'], 'min' => $s['min'], 'max' => $s['max']];
     }
-    sortir(200, [
+    return [
         'ok' => true, 'agence' => $agence, 'direction' => $direction, 'mois' => $mois,
         'lundi' => $lundi, 'indicateurs' => $ind, 'recommandations' => $recos, 'arbitrages' => $arbitrages, 'tournees' => $tournees,
         'champs' => $champs, 'saisies' => (object) $saisies,
         'agences' => $direction ? $db->query('SELECT id, nom FROM agences WHERE actif = 1 ORDER BY nom')->fetchAll() : [],
-    ]);
+        'releve_lundi' => (int) ($u['releve_lundi'] ?? 1) === 1,
+    ];
 }
 
 function a_pilotage_saisie(): void

@@ -25,6 +25,7 @@ async function demarrerEspace() {
   if (!e.client) return vueConnexionClient();
   if (h === '#/motdepasse') return vueMotdepasseClient();
   if (h === '#/export') return vueExportClient();
+  if (h === '#/contrat') return vueContratClient();
   return vueAccueilClient(false, ['#/avenir', '#/historique'].includes(h) ? h.slice(2) : 'sante');
 }
 window.addEventListener('hashchange', () => { if (!location.hash.startsWith('#/invitation/')) demarrerEspace(); });
@@ -173,9 +174,10 @@ async function vueAccueilClient(bienvenue = false, onglet = 'sante') {
 
   const ecrans = { sante: ecranSante, avenir: ecranAvenir, historique: ecranHistorique };
   zone().innerHTML = `${ecrans[onglet] || ecranSante}
-    <p class="compte-liens"><a href="#/motdepasse">Changer mon mot de passe</a> · <button class="discret" id="sortir">Se déconnecter</button></p>
+    <p class="compte-liens"><a href="#/contrat">Mon contrat</a> · <a href="#/motdepasse">Changer mon mot de passe</a> · <button class="discret" id="sortir">Se déconnecter</button></p>
     <nav class="onglets">${[['sante', 'Santé'], ['avenir', 'À venir'], ['historique', 'Historique']].map(([k, l]) => `<a href="#/${k}"${k === onglet ? ' aria-current="page"' : ''}>${l}</a>`).join('')}</nav>`;
   window.scrollTo(0, 0);
+  annoncerContrat();
 
   const f = document.getElementById('f');
   if (f) f.addEventListener('submit', async (ev) => {

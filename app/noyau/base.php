@@ -11,7 +11,7 @@ date_default_timezone_set('Europe/Paris');
 // Un avertissement glissé dans une réponse casse le JSON et peut montrer un chemin du serveur.
 ini_set('display_errors', '0');
 
-const VERSION_SCHEMA = 10;
+const VERSION_SCHEMA = 11;
 const TAILLE_PHOTO_MAX = 4000000;
 const PHOTOS_MAX = 6;
 const EXPEDITEUR = 'contact@maisonflamingo.fr';
@@ -47,6 +47,9 @@ const PART_HEBDO_FORMULE = ['Maison fermée' => 0.25];
 const JOURNEE_CIBLE_MIN = 420;   // sept heures
 const JOURNEE_MAX_MIN = 450;     // sept heures et demie, jamais au-delà
 const JOURNEE_CREUSE_MIN = 300;  // moins de cinq heures : une journée à regrouper ou à remplir
+// Les règles de Google interdisent de ne solliciter que les clients contents : tout client reçoit la demande, une fois,
+// au même moment, quoi que disent ses rapports. Ni contrepartie, ni objectif chiffré pour l'équipe.
+const AVIS_APRES_PASSAGES = 4;
 const PISCINES_JOUR_MAX = 10;    // même dans le temps, au-delà c'est trop physique
 // Ce qu'on vérifie avant de confier une maison à un remplaçant. Tant qu'une case manque, il n'entre chez personne.
 const VIVIER_CONTROLES = ['entretien' => 'Entretien en personne', 'casier' => 'Extrait de casier judiciaire vu', 'permis' => 'Permis B vu',
@@ -301,6 +304,33 @@ function migrer(PDO $db): void
     // Version 10 : les visites se cherchent par technicien et par heure (la journée mesurée, le temps réel d'un client).
     // Sans cet index, mesurer une journée relisait toute la table : 6 secondes pour la Semaine à 5 000 clients.
     $db->exec('CREATE INDEX IF NOT EXISTS i_visites_tech ON visites(technicien_id, quand)');
+    // Version 11 : chaque sauvegarde dit si sa copie chiffrée est bien arrivée hors de l'hébergeur.
+    ajouter_colonne($db, 'sauvegardes', 'externe_le', 'TEXT');
+    ajouter_colonne($db, 'sauvegardes', 'externe_statut', "TEXT NOT NULL DEFAULT ''");
+    ajouter_colonne($db, 'sauvegardes', 'externe_detail', "TEXT NOT NULL DEFAULT ''");
+    // Et chaque responsable choisit de recevoir, ou non, le relevé du lundi.
+    ajouter_colonne($db, 'utilisateurs', 'releve_lundi', 'INTEGER NOT NULL DEFAULT 1');
+    // L'avis Google : le lien de chaque agence, et pour chaque client si la demande est partie (une fois, jamais deux).
+    ajouter_colonne($db, 'agences', 'lien_avis', "TEXT NOT NULL DEFAULT ''");
+    ajouter_colonne($db, 'clients', 'avis_statut', "TEXT NOT NULL DEFAULT ''");
+    ajouter_colonne($db, 'clients', 'avis_le', 'TEXT');
+    // Les contrats : l'identité de la société (paramètres lisibles, pas des secrets), et chaque contrat avec sa preuve de signature.
+    $db->exec("
+        CREATE TABLE IF NOT EXISTS parametres (cle TEXT PRIMARY KEY, valeur TEXT NOT NULL DEFAULT '', maj_le TEXT NOT NULL, maj_par TEXT NOT NULL DEFAULT '');
+        CREATE TABLE IF NOT EXISTS contrats (id INTEGER PRIMARY KEY, client_id INTEGER NOT NULL REFERENCES clients(id), numero TEXT UNIQUE NOT NULL, formule TEXT NOT NULL,
+            prix_mensuel REAL NOT NULL, debut TEXT NOT NULL, engagement_mois INTEGER NOT NULL DEFAULT 0, fondateur INTEGER NOT NULL DEFAULT 0, prix_bloque_jusquau TEXT,
+            statut TEXT NOT NULL DEFAULT 'a_signer', fichier TEXT NOT NULL, empreinte TEXT NOT NULL, modele TEXT NOT NULL DEFAULT '', cree_le TEXT NOT NULL, cree_par TEXT NOT NULL DEFAULT '',
+            signe_le TEXT, signe_ip TEXT, signe_agent TEXT, signe_nom TEXT, signe_compte TEXT, execution_anticipee INTEGER NOT NULL DEFAULT 0,
+            resilie_le TEXT, resiliation_effet TEXT, resiliation_motif TEXT, rappel_reconduction_le TEXT);
+        CREATE INDEX IF NOT EXISTS i_contrats_client ON contrats(client_id, statut);
+        CREATE TABLE IF NOT EXISTS mandats (id INTEGER PRIMARY KEY, client_id INTEGER NOT NULL REFERENCES clients(id), demande TEXT, reference TEXT,
+            statut TEXT NOT NULL DEFAULT 'en_attente', cree_le TEXT NOT NULL, maj_le TEXT NOT NULL);
+        CREATE INDEX IF NOT EXISTS i_mandats_client ON mandats(client_id, statut);
+        CREATE TABLE IF NOT EXISTS factures (id INTEGER PRIMARY KEY, client_id INTEGER NOT NULL REFERENCES clients(id), contrat_id INTEGER NOT NULL REFERENCES contrats(id),
+            numero TEXT UNIQUE NOT NULL, periode TEXT NOT NULL, montant INTEGER NOT NULL, emise_le TEXT NOT NULL, fichier TEXT NOT NULL, empreinte TEXT NOT NULL,
+            statut TEXT NOT NULL DEFAULT 'emise', cree_par TEXT NOT NULL DEFAULT '', paiement TEXT, prelevement_le TEXT, paye_le TEXT, rejet_motif TEXT NOT NULL DEFAULT '',
+            UNIQUE(contrat_id, periode));
+    ");
     $version = (int) $db->query('PRAGMA user_version')->fetchColumn();
     $db->beginTransaction();
     // Une base de la première version a un seul compte, le gérant : il devient la direction,

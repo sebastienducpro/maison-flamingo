@@ -89,7 +89,7 @@ function session_equipe(): ?array
     if (!is_string($c) || strlen($c) < 20) {
         return null;
     }
-    $q = base()->prepare("SELECT u.id, u.nom, u.courriel, u.telephone, u.photo, u.role, u.agence_id, u.totp_actif, u.totp_secret, u.totp_dernier,
+    $q = base()->prepare("SELECT u.id, u.nom, u.courriel, u.telephone, u.photo, u.role, u.agence_id, u.totp_actif, u.totp_secret, u.totp_dernier, u.releve_lundi,
             s.totp_ok, s.jeton AS session, a.nom AS agence_nom
         FROM sessions s JOIN utilisateurs u ON u.id = s.utilisateur_id LEFT JOIN agences a ON a.id = u.agence_id
         WHERE s.jeton = ? AND s.expire > ? AND u.actif = 1 AND u.hash <> ''

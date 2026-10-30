@@ -204,6 +204,8 @@ async function route() {
       case 'vivier': return await vueVivier(morceaux[1]);
       case 'conges': return await vueConges(morceaux[1]);
       case 'fiche': return await vueFiche(morceaux[1]);
+      case 'societe': return await vueSociete();
+      case 'facturation': return await vueFacturation(morceaux[1]);
       case 'equipe': return await vueEquipe();
       case 'agences': return await vueAgences();
       case 'demandes': return await vueDemandes();
@@ -429,7 +431,8 @@ async function vueClient(id) {
       <p>${d.compte ? (d.compte.actif ? `Ouvert pour <strong>${echapper(d.compte.courriel)}</strong>${d.compte.derniere_connexion ? ', dernière visite le ' + echapper(dateFr(d.compte.derniere_connexion, false)) : ', jamais connecté'}.` : 'Fermé.') : 'Pas encore ouvert. Le client reçoit un lien, choisit son mot de passe, et retrouve ses rapports et son jour de passage.'}</p>
       <div class="actions-ligne"><button class="secondaire" id="inviter">${d.compte ? 'Nouveau lien d\'accès' : 'Ouvrir son espace'}</button>${d.compte && d.compte.actif && pilote ? '<button class="discret" id="couper">Fermer l\'accès</button>' : ''}</div>
       <p class="message" id="m-espace" role="status"></p>
-    </div>` : ''}
+    </div>
+    <div id="bloc-contrat"></div>` : ''}
     <h2>Fiche</h2>`}
     <form id="fiche" class="carte">
       <div class="deux"><label>Prénom<input name="prenom" value="${echapper(c.prenom)}"></label><label>Nom<input name="nom" value="${echapper(c.nom)}"></label></div>
@@ -460,6 +463,7 @@ async function vueClient(id) {
     </form>
     ${!nouveau && pilote && !horsLigne ? `<p class="zone-danger"><button class="discret danger" id="supprimer">Supprimer la fiche, ses visites et ses photos</button></p>` : ''}`;
 
+  if (!nouveau && !horsLigne) blocContrat(c);
   const contactFait = async () => {
     if (!c.lead_recu_le || c.lead_contacte_le) return;
     const r = await api('lead_contacte', { methode: 'POST', corps: { id: c.id } }).catch(() => ({ ok: false }));
@@ -824,7 +828,7 @@ async function vueVisite(idClient, type) {
       if (d2.ok) resultat = d2;
     }
     if (resultat) {
-      sessionStorage.setItem('dernier_envoi', JSON.stringify({ id: resultat.id, lien: resultat.lien, type, client: envoi.client }));
+      sessionStorage.setItem('dernier_envoi', JSON.stringify({ id: resultat.id, lien: resultat.lien, type, client: envoi.client, avis: resultat.avis || null }));
       aller('#/envoi');
     } else if (gardeLocale) {
       m.textContent = 'Enregistré sur le téléphone. La visite partira dès que le réseau revient.';
@@ -837,6 +841,9 @@ async function vueVisite(idClient, type) {
 }
 
 /* ---------- L'envoi au client ---------- */
+
+// Une invitation à raconter son expérience, quelle qu'elle soit : jamais « si vous êtes content ».
+const phraseAvis = (e) => `Bonjour ${e.avis.prenom}, voilà un mois que Maison Flamingo s'occupe de votre piscine. Votre avis sur Google, positif ou non, aide vos voisins à choisir : ${e.avis.lien} Merci !`;
 
 function vueEnvoi() {
   let e = null;
@@ -859,7 +866,14 @@ function vueEnvoi() {
       </div>
       <p class="message" id="m" role="status"></p>
       <a class="retour" href="#/client/${e.client.id}">← Retour à la fiche</a>
-    </section>`;
+    </section>
+    ${e.avis ? `<section class="carte" id="avis">
+      <h2>C'est le moment de proposer un avis</h2>
+      <p class="aide">Quatrième passage : tous les clients reçoivent cette demande une fois, au même moment, quoi que disent leurs rapports. Google interdit de ne demander qu'aux clients contents, et toute contrepartie.</p>
+      <p class="note">${echapper(phraseAvis(e))}</p>
+      <div class="actions-ligne">${tel ? `<a class="bouton principal" id="avis-sms" href="sms:${tel}${ios ? '&' : '?'}body=${encodeURIComponent(phraseAvis(e))}">Proposer par SMS</a>` : ''}
+        <button class="discret" id="avis-non">Ce client ne veut pas être sollicité</button></div>
+    </section>` : ''}`;
   const m = document.getElementById('m');
   const sms = document.getElementById('sms');
   if (sms) sms.addEventListener('click', () => { api('visite_marquer_envoyee', { methode: 'POST', corps: { id: e.id } }); });
@@ -873,6 +887,15 @@ function vueEnvoi() {
   document.getElementById('copier').addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(e.lien); m.textContent = 'Lien copié.'; } catch (err) { m.textContent = e.lien; }
   });
+  const noterAvis = async (statut) => {
+    await api('avis_noter', { methode: 'POST', corps: { client_id: e.client.id, statut } });
+    e.avis = null; sessionStorage.setItem('dernier_envoi', JSON.stringify(e));
+    document.getElementById('avis').innerHTML = statut === 'envoye' ? '<p class="bandeau calme">Demande d\'avis envoyée. Elle ne repartira plus pour ce client.</p>' : '<p class="bandeau calme">Noté : ce client ne sera plus sollicité.</p>';
+  };
+  const avisSms = document.getElementById('avis-sms');
+  if (avisSms) avisSms.addEventListener('click', () => { noterAvis('envoye'); });
+  const avisNon = document.getElementById('avis-non');
+  if (avisNon) avisNon.addEventListener('click', () => noterAvis('refuse'));
 }
 
 // Les écrans de pilotage et de tournée sont dans d'autres fichiers : on démarre quand tous sont chargés.

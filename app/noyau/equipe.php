@@ -681,7 +681,7 @@ function a_visite_enregistrer(): void
     $db->prepare('UPDATE clients SET maj_le = ? WHERE id = ?')->execute([maintenant(), $client['id']]);
     $db->commit();
     tracer($u, 'visite enregistrée', "$type $id client {$client['id']}");
-    sortir(200, ['ok' => true, 'id' => $id, 'lien' => url_rapport($jeton)]);
+    sortir(200, ['ok' => true, 'id' => $id, 'lien' => url_rapport($jeton), 'avis' => $type === 'passage' ? avis_a_proposer($client) : null]);
 }
 
 function visite_autorisee(array $u, int $id): array
@@ -1097,9 +1097,37 @@ function a_agences(): void
     $l = base()->query("SELECT a.*, (SELECT COUNT(*) FROM clients c WHERE c.agence_id = a.id AND c.statut = 'client') AS clients,
         (SELECT COUNT(*) FROM utilisateurs u WHERE u.agence_id = a.id AND u.actif = 1) AS membres FROM agences a ORDER BY a.nom")->fetchAll();
     sortir(200, ['ok' => true, 'agences' => array_map(fn ($a) => [
-        'id' => (int) $a['id'], 'nom' => $a['nom'], 'ville' => $a['ville'], 'adresse' => $a['adresse'], 'actif' => (int) $a['actif'] === 1,
+        'id' => (int) $a['id'], 'nom' => $a['nom'], 'ville' => $a['ville'], 'adresse' => $a['adresse'], 'lien_avis' => $a['lien_avis'], 'actif' => (int) $a['actif'] === 1,
         'clients' => (int) $a['clients'], 'membres' => (int) $a['membres'], 'carte' => $a['lat'] !== null,
     ], $l)]);
+}
+
+// Le moment de proposer un avis : le quatrième passage, pour tout client actif qui ne l'a pas encore reçu.
+function avis_a_proposer(array $c): ?array
+{
+    $q = base()->prepare("SELECT c.statut, c.avis_statut, c.prenom, a.lien_avis, (SELECT COUNT(*) FROM visites v WHERE v.client_id = c.id AND v.type = 'passage') AS passages
+        FROM clients c LEFT JOIN agences a ON a.id = c.agence_id WHERE c.id = ?");
+    $q->execute([$c['id']]);
+    $x = $q->fetch();
+    if (!$x || $x['statut'] !== 'client' || $x['avis_statut'] !== '' || $x['lien_avis'] === '' || (int) $x['passages'] < AVIS_APRES_PASSAGES) {
+        return null;
+    }
+    return ['lien' => $x['lien_avis'], 'prenom' => $x['prenom']];
+}
+
+function a_avis_noter(): void
+{
+    $u = exiger_equipe();
+    exiger_post();
+    $d = entree();
+    $c = exiger_client_autorise($u, entier($d['client_id'] ?? 0));
+    $statut = in_array($d['statut'] ?? '', ['envoye', 'refuse'], true) ? $d['statut'] : null;
+    if (!$statut) {
+        sortir(200, ['ok' => false, 'erreur' => 'statut']);
+    }
+    base()->prepare("UPDATE clients SET avis_statut = ?, avis_le = ? WHERE id = ? AND avis_statut = ''")->execute([$statut, maintenant(), $c['id']]);
+    tracer($u, $statut === 'envoye' ? 'avis proposé' : 'avis : client à ne pas solliciter', (string) $c['id']);
+    sortir(200, ['ok' => true]);
 }
 
 function a_agence_enregistrer(): void
@@ -1113,15 +1141,19 @@ function a_agence_enregistrer(): void
     }
     $ville = texte($d['ville'] ?? '', 60);
     $adresse = texte($d['adresse'] ?? '', 200);
+    $lien_avis = texte($d['lien_avis'] ?? '', 300);
+    if ($lien_avis !== '' && !preg_match('#^https://[^\s"<>]+$#', $lien_avis)) {
+        sortir(200, ['ok' => false, 'erreur' => 'lien']);
+    }
     $g = $adresse !== '' ? geocoder($adresse, $ville) : null;
     $db = base();
     $id = entier($d['id'] ?? 0);
     try {
         if ($id > 0) {
-            $db->prepare('UPDATE agences SET nom = ?, ville = ?, adresse = ?, lat = COALESCE(?, lat), lon = COALESCE(?, lon), actif = ? WHERE id = ?')
-                ->execute([$nom, $ville, $adresse, $g['lat'] ?? null, $g['lon'] ?? null, empty($d['ferme']) ? 1 : 0, $id]);
+            $db->prepare('UPDATE agences SET nom = ?, ville = ?, adresse = ?, lien_avis = ?, lat = COALESCE(?, lat), lon = COALESCE(?, lon), actif = ? WHERE id = ?')
+                ->execute([$nom, $ville, $adresse, $lien_avis, $g['lat'] ?? null, $g['lon'] ?? null, empty($d['ferme']) ? 1 : 0, $id]);
         } else {
-            $db->prepare('INSERT INTO agences (nom, ville, adresse, lat, lon, cree_le) VALUES (?,?,?,?,?,?)')->execute([$nom, $ville, $adresse, $g['lat'] ?? null, $g['lon'] ?? null, maintenant()]);
+            $db->prepare('INSERT INTO agences (nom, ville, adresse, lien_avis, lat, lon, cree_le) VALUES (?,?,?,?,?,?,?)')->execute([$nom, $ville, $adresse, $lien_avis, $g['lat'] ?? null, $g['lon'] ?? null, maintenant()]);
             $id = (int) $db->lastInsertId();
         }
     } catch (PDOException $e) {
@@ -1234,6 +1266,9 @@ function a_tableau(): void
     if ($u['role'] === 'superadmin') {
         $s = derniere_sauvegarde();
         $sortie['sauvegarde'] = $s ? ['quand' => $s['quand'], 'octets' => (int) $s['octets'], 'en_retard' => strtotime($s['quand']) < time() - SAUVEGARDE_AGE_MAX] : null;
+        $x = derniere_copie_externe();
+        $sortie['externe'] = ['configure' => (bool) externe_config(), 'quand' => $x['externe_le'] ?? null,
+            'en_retard' => !$x || strtotime($x['externe_le']) < time() - SAUVEGARDE_AGE_MAX];
         $sortie['agences'] = $db->query('SELECT id, nom FROM agences ORDER BY nom')->fetchAll();
     }
     sortir(200, $sortie);
@@ -1340,11 +1375,13 @@ function a_journal(): void
 function a_sauvegardes(): void
 {
     exiger_equipe(['superadmin']);
-    $l = base()->query('SELECT id, quand, fichier, octets, statut, origine, detail FROM sauvegardes ORDER BY id DESC LIMIT 60')->fetchAll();
+    $l = base()->query('SELECT id, quand, fichier, octets, statut, origine, detail, externe_le, externe_statut, externe_detail FROM sauvegardes ORDER BY id DESC LIMIT 60')->fetchAll();
     foreach ($l as &$s) {
         $s['present'] = $s['statut'] === 'ok' && is_file(dossier_sauvegardes() . '/' . basename($s['fichier']));
     }
-    sortir(200, ['ok' => true, 'sauvegardes' => $l, 'age_max_h' => SAUVEGARDE_AGE_MAX / 3600]);
+    $c = externe_config();
+    sortir(200, ['ok' => true, 'sauvegardes' => $l, 'age_max_h' => SAUVEGARDE_AGE_MAX / 3600,
+        'externe' => ['configure' => (bool) $c, 'point' => $c['point'] ?? '', 'seau' => $c['seau'] ?? '', 'region' => $c['region'] ?? '']]);
 }
 
 function a_sauvegarde_lancer(): void

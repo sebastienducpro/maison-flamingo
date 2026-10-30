@@ -165,6 +165,7 @@ async function vueTableau(agence) {
       ${sa ? `<select id="agence" aria-label="Agence"><option value="">Toutes les agences</option>${d.agences.map((a) => `<option value="${a.id}"${a.id === d.agence ? ' selected' : ''}>${echapper(a.nom)}</option>`).join('')}</select>` : ''}
     </div>
     ${sa ? `<p class="bandeau ${!s || s.en_retard ? 'alerte' : 'calme'}">${!s ? 'Aucune sauvegarde encore faite.' : s.en_retard ? 'La dernière sauvegarde date du ' + echapper(dateFr(s.quand)) + ' : elle est en retard.' : 'Dernière sauvegarde le ' + echapper(dateFr(s.quand)) + ', relue et complète.'} <a href="#/sauvegardes">Voir</a></p>` : ''}
+    ${sa && d.externe ? `<p class="bandeau ${d.externe.configure && !d.externe.en_retard ? 'calme' : 'alerte'}">${!d.externe.configure ? 'La copie hors de l\'hébergeur n\'est pas configurée.' : d.externe.en_retard ? 'La copie hors de l\'hébergeur est en retard' + (d.externe.quand ? ' : dernière le ' + echapper(dateFr(d.externe.quand)) : '') + '.' : 'Copie hors de l\'hébergeur arrivée le ' + echapper(dateFr(d.externe.quand)) + '.'} <a href="#/sauvegardes">Voir</a></p>` : ''}
     ${d.clients_sans_tournee ? `<p class="bandeau alerte">${d.clients_sans_tournee} client${d.clients_sans_tournee > 1 ? 's' : ''} sans technicien ou sans jour de passage. <a href="#/clients">Les attribuer</a></p>` : ''}
     <div class="kpis">
       ${tuileHtml(d.statuts.client, 'clients actifs', d.statuts.prospect + ' prospects' + (d.statuts.veille ? ' · ' + d.statuts.veille + ' en veille' : ''))}
@@ -322,23 +323,24 @@ async function vueAgences() {
   vue().innerHTML = '<p class="chargement">Chargement…</p>';
   const d = await api('agences');
   if (!d.ok) return;
-  const formulaire = (a = { id: 0, nom: '', ville: '', adresse: '' }) => `
+  const formulaire = (a = { id: 0, nom: '', ville: '', adresse: '', lien_avis: '' }) => `
     <form class="carte agence" data-id="${a.id}">
       <h2>${a.id ? echapper(a.nom) : 'Nouvelle agence'}</h2>
       ${a.id ? `<p class="aide">${a.clients} client${a.clients > 1 ? 's' : ''} · ${a.membres} personne${a.membres > 1 ? 's' : ''}${a.carte ? '' : ' · départ des tournées non placé sur la carte'}</p>` : ''}
       <div class="deux"><label>Nom<input name="nom" value="${echapper(a.nom)}" required></label><label>Ville<input name="ville" value="${echapper(a.ville)}"></label></div>
       <label>Adresse de départ des tournées<input name="adresse" value="${echapper(a.adresse)}"></label>
+      <label>Lien pour laisser un avis Google <span class="aide">fiche Google de l'agence, « Demander des avis » ; vide : aucune demande ne part</span><input name="lien_avis" type="url" value="${echapper(a.lien_avis || '')}" placeholder="https://g.page/r/…/review"></label>
       <button class="${a.id ? 'secondaire' : 'principal'}">${a.id ? 'Enregistrer' : 'Créer l\'agence'}</button>
       <p class="message" role="status"></p>
     </form>`;
-  vue().innerHTML = `<h1>Agences</h1>${d.agences.map(formulaire).join('')}${formulaire()}`;
+  vue().innerHTML = `<h1>Agences</h1><p><a href="#/societe">La société et ses contrats →</a> · <a href="#/facturation">Facturation et prélèvements →</a></p>${d.agences.map(formulaire).join('')}${formulaire()}`;
   vue().querySelectorAll('form.agence').forEach((f) => f.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const corps = Object.fromEntries(new FormData(f).entries());
     corps.id = +f.dataset.id;
     const r = await api('agence_enregistrer', { methode: 'POST', corps });
     const m = f.querySelector('.message');
-    if (!r.ok) { m.textContent = r.erreur === 'nom_pris' ? 'Une agence porte déjà ce nom.' : 'Il faut un nom.'; return; }
+    if (!r.ok) { m.textContent = { nom_pris: 'Une agence porte déjà ce nom.', lien: 'Le lien d\'avis doit commencer par https://.' }[r.erreur] || 'Il faut un nom.'; return; }
     m.textContent = corps.adresse && !r.carte ? 'Enregistrée. L\'adresse n\'a pas été trouvée sur la carte.' : 'Enregistrée.';
     if (!corps.id) setTimeout(vueAgences, 800);
   }));
@@ -386,24 +388,60 @@ async function vueSauvegardes() {
   const octets = (n) => (n > 1048576 ? (n / 1048576).toFixed(1).replace('.', ',') + ' Mo' : Math.max(1, Math.round(n / 1024)) + ' Ko');
   const derniere = d.sauvegardes.find((s) => s.statut === 'ok');
   const retard = !derniere || Date.now() - new Date(derniere.quand) > d.age_max_h * 3600000;
+  const dehors = d.sauvegardes.find((s) => s.externe_statut === 'ok');
+  const dehorsRetard = !dehors || Date.now() - new Date(dehors.externe_le) > d.age_max_h * 3600000;
+  const x = d.externe;
   vue().innerHTML = `
     <h1>Sauvegardes</h1>
     <p class="bandeau ${retard ? 'alerte' : 'calme'}">${derniere ? 'Dernière copie le ' + echapper(dateFr(derniere.quand)) + ' : ' + echapper(derniere.detail) + '.' : 'Aucune copie encore.'}</p>
+    <p class="bandeau ${x.configure && !dehorsRetard ? 'calme' : 'alerte'}">${!x.configure ? 'La copie hors de l\'hébergeur n\'est pas encore configurée : tant qu\'elle ne l\'est pas, téléchargez la dernière copie chaque semaine.' : dehors ? 'Dernière copie arrivée hors de l\'hébergeur le ' + echapper(dateFr(dehors.externe_le)) + ', chiffrée et reçue intacte.' : 'Configurée, mais aucune copie n\'est encore arrivée dehors.'}</p>
     <section class="carte">
-      <p>Chaque nuit, une copie complète de la base est faite, rouverte et vérifiée. Trente jours sont gardés, puis une par mois pendant un an. Si la tâche de nuit manque, la première connexion du lendemain fait la copie.</p>
-      <p><strong>Une fois par semaine, téléchargez la dernière</strong> sur votre ordinateur : une copie qui ne vit que sur l'hébergement disparaît avec lui. Les photos sont dans les sauvegardes de l'hébergement.</p>
-      <button class="principal" id="lancer">Faire une copie maintenant</button>
+      <p>Chaque nuit à 3 h, une copie complète de la base est faite, rouverte et vérifiée, puis envoyée chiffrée hors de l'hébergeur. Trente jours sont gardés ici, puis une par mois pendant un an. Si la tâche de nuit manque, la première connexion du lendemain fait la copie ; l'envoi dehors attend alors la nuit suivante.</p>
+      <div class="actions-ligne"><button class="principal" id="lancer">Faire une copie maintenant</button>${x.configure ? '<button class="secondaire" id="dehors">L\'envoyer dehors maintenant</button>' : ''}</div>
       <p class="message" id="m" role="status"></p>
     </section>
-    <div class="table-defile"><table><thead><tr><th>Quand</th><th>Origine</th><th>Taille</th><th>État</th><th></th></tr></thead>
+    <details class="carte" ${x.configure ? '' : 'open'}><summary><strong>Le stockage hors de l'hébergeur</strong>${x.configure ? ` <span class="sous">${echapper(x.point)} · ${echapper(x.seau)}</span>` : ''}</summary>
+      <p class="aide">Un stockage objet compatible S3 (Backblaze B2, Cloudflare R2, OVH Object Storage). Créez-y un espace dédié et une clé qui peut <strong>seulement écrire</strong> : ni lire, ni effacer. Si le serveur était piraté, l'intrus ne pourrait pas détruire les copies. Réglez chez le fournisseur l'effacement des copies de plus de 90 jours.</p>
+      <form id="stockage">
+        <label>Adresse du stockage<input name="point" placeholder="https://s3.eu-central-003.backblazeb2.com" value="${echapper(x.point)}" required></label>
+        <div class="deux"><label>Région<input name="region" placeholder="eu-central-003" value="${echapper(x.region)}" required></label><label>Espace (bucket)<input name="seau" value="${echapper(x.seau)}" required></label></div>
+        <div class="deux"><label>Identifiant de la clé<input name="cle_id" autocomplete="off" required></label><label>Clé secrète <span class="aide">jamais réaffichée</span><input name="cle_secrete" type="password" autocomplete="new-password" required></label></div>
+        <button class="principal">${x.configure ? 'Remplacer les accès' : 'Enregistrer'}</button>
+        <p class="message" id="m-stockage" role="status"></p>
+      </form>
+    </details>
+    <div class="table-defile"><table><thead><tr><th>Quand</th><th>Origine</th><th>Taille</th><th>État</th><th>Hors hébergeur</th><th></th></tr></thead>
     <tbody>${d.sauvegardes.map((s) => `<tr class="${s.statut === 'ok' ? '' : 'refus'}"><td>${echapper(dateFr(s.quand))}</td><td>${echapper(s.origine)}</td><td>${s.octets ? octets(s.octets) : '–'}</td><td>${s.statut === 'ok' ? 'relue' : 'échec : ' + echapper(s.detail)}</td>
+      <td>${s.externe_statut === 'ok' ? 'arrivée intacte' : s.externe_statut === 'echec' ? 'échec : ' + echapper(s.externe_detail) : '–'}</td>
       <td>${s.present ? `<a href="api.php?action=sauvegarde_telecharger&id=${s.id}">Télécharger</a>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
+  const m = document.getElementById('m');
   document.getElementById('lancer').addEventListener('click', async () => {
-    const m = document.getElementById('m');
     m.textContent = 'Copie en cours…';
     const r = await api('sauvegarde_lancer', { methode: 'POST', corps: {} });
     m.textContent = r.ok ? 'Copie faite et relue.' : 'La copie a échoué : regardez le journal.';
     setTimeout(vueSauvegardes, 900);
+  });
+  const dehorsBouton = document.getElementById('dehors');
+  if (dehorsBouton) dehorsBouton.addEventListener('click', async () => {
+    dehorsBouton.disabled = true;
+    m.textContent = 'Chiffrement et envoi…';
+    const r = await api('stockage_essayer', { methode: 'POST', corps: {} });
+    m.textContent = r.ok ? 'Copie arrivée hors de l\'hébergeur, reçue intacte.' : 'L\'envoi a échoué' + (r.detail ? ' : ' + r.detail : '') + '. Vérifiez les accès du stockage.';
+    if (r.ok) setTimeout(vueSauvegardes, 1200); else dehorsBouton.disabled = false;
+  });
+  const f = document.getElementById('stockage');
+  f.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const mm = document.getElementById('m-stockage');
+    const r = await api('stockage_configurer', { methode: 'POST', corps: Object.fromEntries(['point', 'region', 'seau', 'cle_id', 'cle_secrete'].map((k) => [k, f[k].value.trim()])) });
+    if (!r.ok) { mm.textContent = 'Vérifiez l\'adresse (https://…), la région, le nom de l\'espace et la clé.'; return; }
+    f.cle_secrete.value = '';
+    if (!r.cle_chiffrement) { mm.textContent = 'Accès remplacés. La clé de chiffrement reste la même.'; return; }
+    // La clé de chiffrement n'est montrée qu'ici, une fois : sans elle, les copies externes ne se rouvrent pas.
+    mm.innerHTML = `<span class="bandeau alerte">Notez cette clé de chiffrement <strong>maintenant</strong>, hors de ce serveur (gestionnaire de mots de passe, papier au coffre). Elle ne sera plus jamais affichée. Sans elle, les copies externes ne se rouvrent pas si le serveur disparaît.</span>
+      <code class="lien">${echapper(r.cle_chiffrement)}</code> <button type="button" class="secondaire" id="copier-cle">Copier la clé</button> <button type="button" class="principal" id="cle-notee">C'est noté</button>`;
+    document.getElementById('copier-cle').addEventListener('click', async () => { try { await navigator.clipboard.writeText(r.cle_chiffrement); } catch (err) { /* la clé reste affichée */ } });
+    document.getElementById('cle-notee').addEventListener('click', vueSauvegardes);
   });
 }
 
