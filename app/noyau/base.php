@@ -11,7 +11,7 @@ date_default_timezone_set('Europe/Paris');
 // Un avertissement glissé dans une réponse casse le JSON et peut montrer un chemin du serveur.
 ini_set('display_errors', '0');
 
-const VERSION_SCHEMA = 9;
+const VERSION_SCHEMA = 10;
 const TAILLE_PHOTO_MAX = 4000000;
 const PHOTOS_MAX = 6;
 const EXPEDITEUR = 'contact@maisonflamingo.fr';
@@ -298,6 +298,9 @@ function migrer(PDO $db): void
             decide_par TEXT NOT NULL DEFAULT '', decide_le TEXT, absence_id INTEGER, cree_le TEXT NOT NULL);
         CREATE INDEX IF NOT EXISTS i_conges ON demandes_conges(statut, utilisateur_id);
     ");
+    // Version 10 : les visites se cherchent par technicien et par heure (la journée mesurée, le temps réel d'un client).
+    // Sans cet index, mesurer une journée relisait toute la table : 6 secondes pour la Semaine à 5 000 clients.
+    $db->exec('CREATE INDEX IF NOT EXISTS i_visites_tech ON visites(technicien_id, quand)');
     $version = (int) $db->query('PRAGMA user_version')->fetchColumn();
     $db->beginTransaction();
     // Une base de la première version a un seul compte, le gérant : il devient la direction,

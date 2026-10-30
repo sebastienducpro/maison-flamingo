@@ -55,8 +55,11 @@ function estimer_durees(array $ids, string $type = 'passage', array $formules = 
         return $sortie;
     }
     $marques = implode(',', array_fill(0, count($ids), '?'));
-    $q = base()->prepare("SELECT client_id, duree_min FROM visites WHERE client_id IN ($marques) AND type = ? AND duree_min IS NOT NULL ORDER BY quand DESC");
-    $q->execute([...$ids, $type]);
+    // Les huit dernières par client, triées par la base : remonter tout l'historique coûtait cher passé deux ans de visites.
+    $q = base()->prepare("SELECT client_id, duree_min FROM (SELECT client_id, duree_min, ROW_NUMBER() OVER (PARTITION BY client_id ORDER BY quand DESC) AS rang
+        FROM visites WHERE client_id IN ($marques) AND type = ? AND duree_min IS NOT NULL AND quand >= ?) WHERE rang <= 8");
+    // Bornée à l'année écoulée : le coût reste le même après dix ans de visites, et une durée vieille d'un an ne dit plus rien.
+    $q->execute([...$ids, $type, date('Y-m-d', strtotime('-365 days'))]);
     $par = [];
     foreach ($q->fetchAll() as $l) {
         if (count($par[$l['client_id']] ?? []) < 8) {
@@ -163,8 +166,9 @@ function absent_le(int $utilisateur, string $date): ?array
 function mesure_journee(int $utilisateur, string $date): array
 {
     $q = base()->prepare("SELECT v.client_id, v.quand, v.duree_min, c.prenom, c.nom FROM visites v JOIN clients c ON c.id = v.client_id
-        WHERE v.technicien_id = ? AND substr(v.quand, 1, 10) = ? ORDER BY v.quand");
-    $q->execute([$utilisateur, $date]);
+        WHERE v.technicien_id = ? AND v.quand >= ? AND v.quand < ? ORDER BY v.quand");
+    // Une plage sur l'heure écrite plutôt qu'un substr : l'index (technicien, heure) sert, la table n'est pas relue.
+    $q->execute([$utilisateur, $date, date('Y-m-d', strtotime($date . ' +1 day'))]);
     $v = $q->fetchAll();
     $ecarts = [];
     for ($i = 1; $i < count($v); $i++) {
@@ -187,7 +191,7 @@ function mesure_journee(int $utilisateur, string $date): array
 function temps_reel_client(int $client): ?int
 {
     $q = base()->prepare("SELECT v.quand, v.technicien_id,
-            (SELECT p.quand FROM visites p WHERE p.technicien_id = v.technicien_id AND substr(p.quand, 1, 10) = substr(v.quand, 1, 10) AND p.quand < v.quand ORDER BY p.quand DESC LIMIT 1) AS avant
+            (SELECT p.quand FROM visites p WHERE p.technicien_id = v.technicien_id AND p.quand >= substr(v.quand, 1, 10) AND p.quand < v.quand ORDER BY p.quand DESC LIMIT 1) AS avant
         FROM visites v WHERE v.client_id = ? AND v.type = 'passage' AND v.technicien_id IS NOT NULL ORDER BY v.quand DESC LIMIT 8");
     $q->execute([$client]);
     $ecarts = [];
@@ -233,15 +237,17 @@ function bilan_journee(array $technicien, int $jour, ?string $date = null): arra
     $charges = [];
     if ($ids) {
         $marques = implode(',', array_fill(0, count($ids), '?'));
-        $v = $db->prepare("SELECT client_id, quand, charge FROM visites WHERE client_id IN ($marques) ORDER BY quand DESC");
-        $v->execute($ids);
+        // Fait aujourd'hui, et la dernière charge notée : deux questions précises, pas tout l'historique des clients.
+        $v = $db->prepare("SELECT DISTINCT client_id FROM visites WHERE client_id IN ($marques) AND quand >= ?");
+        $v->execute([...$ids, $aujourdhui]);
+        foreach ($v->fetchAll(PDO::FETCH_COLUMN) as $id) {
+            $faits[$id] = true;
+        }
+        $v = $db->prepare("SELECT client_id, charge FROM (SELECT client_id, charge, ROW_NUMBER() OVER (PARTITION BY client_id ORDER BY quand DESC) AS rang
+            FROM visites WHERE client_id IN ($marques) AND charge <> '' AND quand >= ?) WHERE rang = 1");
+        $v->execute([...$ids, date('Y-m-d', strtotime('-365 days'))]);
         foreach ($v->fetchAll() as $l) {
-            if (substr($l['quand'], 0, 10) === $aujourdhui) {
-                $faits[$l['client_id']] = true;
-            }
-            if (!isset($charges[$l['client_id']]) && $l['charge'] !== '') {
-                $charges[$l['client_id']] = $l['charge'];
-            }
+            $charges[$l['client_id']] = $l['charge'];
         }
     }
     $depart = depart_agence($technicien['agence_id'] !== null ? (int) $technicien['agence_id'] : null);
