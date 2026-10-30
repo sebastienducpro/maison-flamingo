@@ -104,6 +104,22 @@ const RECOMMANDATIONS = [
             'Y placer ce qui n\'a pas de jour fixe : interventions, diagnostics, saison hérisson, formation.',
             'Remplir avec des voisins des rues déjà servies plutôt qu\'avec des clients isolés.']],
     ],
+    'couverture' => [
+        'alerte' => ['Une absence des trois prochains jours n\'est pas couverte', 'chef', [
+            'Ouvrir l\'écran Absences : l\'outil propose les collègues qui ont encore de la marge ce jour-là.',
+            'Si personne n\'a de marge, confier la journée à un remplaçant prêt du vivier.',
+            'En dernier recours, prévenir les clients par SMS et décaler leur passage, avant le jour, jamais après.']],
+        'attention' => ['Des absences à venir ne sont pas encore couvertes', 'chef', [
+            'Les répartir cette semaine depuis l\'écran Absences, pendant qu\'il y a le choix.']],
+    ],
+    'vivier' => [
+        'alerte' => ['Aucun remplaçant prêt dans une agence', 'agence', [
+            'Rencontrer deux personnes ce mois-ci : étudiants des écoles voisines, demandeurs d\'emploi via France Travail, personnes recommandées par l\'équipe.',
+            'Faire avec chacune les six vérifications avant d\'en avoir besoin, journée d\'essai en binôme comprise.',
+            'Un remplaçant se recrute en contrat à durée déterminée, jamais en auto-entrepreneur.']],
+        'attention' => ['Un seul remplaçant prêt dans une agence', 'agence', [
+            'Compléter le vivier avant l\'été et les congés : il en faut deux pour qu\'une absence n\'en devienne pas deux.']],
+    ],
     'passages_courts' => [
         'alerte' => ['Trop de passages durent moins de 20 minutes', 'chef', [
             'Accompagner cette semaine les tournées concernées, sans prévenir et sans juger.',
@@ -331,7 +347,7 @@ function a_pilotage(): void
 
     // ---- L'équipe ----
     // Ni les casser, ni les payer à rien faire, ni y perdre : chaque journée se mesure en heures, chaque semaine aussi.
-    $q = $db->prepare("SELECT id, nom, agence_id FROM utilisateurs WHERE role = 'technicien' AND actif = 1 AND hash <> ''" . ($agence ? ' AND agence_id = ?' : '') . ' ORDER BY nom');
+    $q = $db->prepare("SELECT id, nom, agence_id FROM utilisateurs WHERE role = 'technicien' AND actif = 1 AND expire_le IS NULL AND hash <> ''" . ($agence ? ' AND agence_id = ?' : '') . ' ORDER BY nom');
     $q->execute($p);
     $tournees = [];
     $trop = [];
@@ -367,6 +383,28 @@ function a_pilotage(): void
         : indicateur('journees', 'Journées trop chargées ou creuses', $trop ? count($trop) . ' trop chargée' . (count($trop) > 1 ? 's' : '') : ($creuses ? count($creuses) . ' creuse' . (count($creuses) > 1 ? 's' : '') : 'aucune'),
             'entre 5 h et 7 h 30, 10 piscines au plus', $trop ? 'alerte' : ($creuses ? 'attention' : 'ok'), 'chef',
             $trop ? 'Trop chargées : ' . implode(', ', array_slice($trop, 0, 6)) . '.' : ($creuses ? 'Creuses : ' . implode(', ', array_slice($creuses, 0, 6)) . '.' : 'Toutes les journées tiennent entre 5 h et 7 h 30.'));
+
+    // La couverture : chaque journée d'absence des quinze prochains jours a-t-elle quelqu'un pour chaque client ?
+    $couverture = couverture_a_venir($agence);
+    $trous = array_values(array_filter($couverture, fn ($j) => $j['a_couvrir'] > 0));
+    $proches = array_values(array_filter($trous, fn ($j) => $j['date'] <= date('Y-m-d', strtotime('+3 days'))));
+    $ind[] = indicateur('couverture', 'Journées d\'absence à couvrir, quinze jours', (string) count($trous), 'aucune', $proches ? 'alerte' : ($trous ? 'attention' : 'ok'), 'chef',
+        $trous ? implode(', ', array_map(fn ($j) => $j['technicien']['nom'] . ' le ' . date('d/m', strtotime($j['date'])) . ' (' . $j['a_couvrir'] . ' client' . ($j['a_couvrir'] > 1 ? 's' : '') . ')', array_slice($trous, 0, 5))) . '.' : 'Toutes les absences à venir sont couvertes.');
+
+    // Le vivier : des remplaçants déjà vérifiés, avant d'en avoir besoin. Deux par agence au moins, dès qu'une équipe existe.
+    $v = $db->prepare('SELECT a.nom, (SELECT COUNT(*) FROM vivier v WHERE v.agence_id = a.id AND v.ecarte = 0 AND v.entretien = 1 AND v.casier = 1 AND v.permis = 1 AND v.essai = 1 AND v.securite = 1 AND v.cles = 1) AS prets,
+        (SELECT COUNT(*) FROM utilisateurs u WHERE u.agence_id = a.id AND u.role = \'technicien\' AND u.actif = 1 AND u.hash <> \'\' AND u.expire_le IS NULL) AS equipe
+        FROM agences a WHERE a.actif = 1' . ($agence ? ' AND a.id = ?' : ''));
+    $v->execute($agence ? [$agence] : []);
+    $agences_vivier = array_values(array_filter($v->fetchAll(), fn ($r) => (int) $r['equipe'] > 0));
+    if (!$agences_vivier) {
+        $ind[] = indicateur('vivier', 'Remplaçants prêts dans le vivier', null, 'deux par agence', 'pas_assez', 'agence', 'Pas encore d\'équipe à remplacer.');
+    } else {
+        usort($agences_vivier, fn ($a, $b) => (int) $a['prets'] <=> (int) $b['prets']);
+        $min = (int) $agences_vivier[0]['prets'];
+        $ind[] = indicateur('vivier', 'Remplaçants prêts dans le vivier', $min . ($agence ? '' : ' au moins'), 'deux par agence', $min === 0 ? 'alerte' : ($min < 2 ? 'attention' : 'ok'), 'agence',
+            implode(', ', array_map(fn ($r) => $r['nom'] . ' : ' . (int) $r['prets'], $agences_vivier)));
+    }
 
     [$mesures, $courts, $duree] = $un("SELECT COUNT(*), SUM(v.duree_min < ?), AVG(v.duree_min) FROM visites v JOIN clients c ON c.id = v.client_id
         WHERE $w AND v.type = 'passage' AND v.duree_min IS NOT NULL AND v.quand >= ?", [PASSAGE_COURT_MIN, ...$p, $il_y_a(30)]);

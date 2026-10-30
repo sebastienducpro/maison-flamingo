@@ -92,7 +92,8 @@ function session_equipe(): ?array
     $q = base()->prepare("SELECT u.id, u.nom, u.courriel, u.telephone, u.photo, u.role, u.agence_id, u.totp_actif, u.totp_secret, u.totp_dernier,
             s.totp_ok, s.jeton AS session, a.nom AS agence_nom
         FROM sessions s JOIN utilisateurs u ON u.id = s.utilisateur_id LEFT JOIN agences a ON a.id = u.agence_id
-        WHERE s.jeton = ? AND s.expire > ? AND u.actif = 1 AND u.hash <> ''");
+        WHERE s.jeton = ? AND s.expire > ? AND u.actif = 1 AND u.hash <> ''
+            AND (u.expire_le IS NULL OR u.expire_le >= date('now', 'localtime'))");   // un accès temporaire s'éteint seul, sans qu'on y pense
     $q->execute([hash('sha256', $c), time()]);
     $u = $q->fetch();
     return $u ?: null;
@@ -253,7 +254,10 @@ function portee_clients(array $u, string $a = 'c'): array
         case 'chef':
             return ["$a.agence_id = ?", [(int) $u['agence_id']]];
         case 'technicien':
-            return ["$a.agence_id = ? AND $a.technicien_id = ?", [(int) $u['agence_id'], (int) $u['id']]];
+            // Ses clients, plus ceux qu'on lui confie pour un jour de remplacement : la veille pour préparer,
+            // le lendemain pour qu'un rapport parti sans réseau arrive encore. Jamais au-delà.
+            return ["(($a.agence_id = ? AND $a.technicien_id = ?) OR $a.id IN (SELECT r.client_id FROM remplacements r WHERE r.technicien_id = ?
+                AND r.date BETWEEN date('now', 'localtime', '-1 day') AND date('now', 'localtime', '+1 day')))", [(int) $u['agence_id'], (int) $u['id'], (int) $u['id']]];
         default:
             return ['0=1', []];
     }

@@ -20,7 +20,9 @@ async function vueTournee(idTech, jourDemande) {
   let techniciens = [];
   if (pilote) {
     const e = await api('equipe');
-    techniciens = (e.membres || []).filter((m) => m.role === 'technicien' && m.actif);
+    // Un remplaçant reste visible pendant sa mission, pour suivre les clients qu'on lui a confiés ; après, il sort de la liste.
+    const auj = new Date().toLocaleDateString('sv-SE');
+    techniciens = (e.membres || []).filter((m) => m.role === 'technicien' && m.actif && (!m.remplacant_jusquau || m.remplacant_jusquau >= auj));
     if (!idTech && techniciens.length) idTech = techniciens[0].id;
     if (!techniciens.length) { vue().innerHTML = '<h1>Tournées</h1><p>Aucun technicien actif pour l\'instant. Invitez-en un depuis <a href="#/equipe">Équipe</a>.</p>'; return; }
   }
@@ -44,6 +46,7 @@ async function vueTournee(idTech, jourDemande) {
     <div class="tete"><h1>${pilote ? 'Tournée de ' + echapper(d.technicien.nom) : 'Ma tournée'}</h1>
       ${pilote ? `<select id="tech" aria-label="Technicien">${techniciens.map((t) => `<option value="${t.id}"${t.id === +idTech ? ' selected' : ''}>${echapper(t.nom)}</option>`).join('')}</select>` : ''}</div>
     <nav class="jours">${[1, 2, 3, 4, 5, 6].map((j) => `<a href="${base}/${j}"${j === jour ? ' aria-current="page"' : ''}>${JOURS[j].slice(0, 3)}</a>`).join('')}</nav>
+    ${d.absent ? `<p class="bandeau calme">${pilote ? echapper(d.technicien.nom) + ' est absent' : 'Vous êtes absent'} ${d.absent.du === d.absent.au ? 'ce jour-là' : 'du ' + echapper(dateFr(d.absent.du + 'T12:00:00', false)) + ' au ' + echapper(dateFr(d.absent.au + 'T12:00:00', false))} : ${pilote ? 'ses clients se confient depuis <a href="#/absences">Absences</a>' : 'vos clients sont confiés à un collègue pour la journée'}.</p>` : ''}
     ${d.arrets.length ? `
     <div class="resume">
       <div><strong>${d.arrets.length}</strong> arrêt${d.arrets.length > 1 ? 's' : ''}${faits ? ` · ${faits} fait${faits > 1 ? 's' : ''}` : ''}</div>
@@ -58,7 +61,7 @@ async function vueTournee(idTech, jourDemande) {
     <ol class="arrets">${d.arrets.map((a, i) => `<li class="${a.fait ? 'fait' : ''}">
       <span class="numero">${i + 1}</span>
       <div class="arret">
-        <a class="nom" href="#/client/${a.id}">${echapper((a.prenom + ' ' + a.nom).trim())}</a>
+        <a class="nom" href="#/client/${a.id}">${echapper((a.prenom + ' ' + a.nom).trim())}</a>${a.remplace ? ` <span class="pastille orange">remplace ${echapper(a.remplace)}</span>` : ''}
         <span class="sous">${echapper([a.adresse, a.commune].filter(Boolean).join(', '))}</span>
         <span class="sous">environ ${a.duree} min${a.charge ? ' · dernière charge ' + CHARGES[a.charge].toLowerCase() : ''}${a.fait ? ' · fait aujourd\'hui' : ''}</span>
         ${a.acces ? `<p class="acces"><strong>Accès</strong> ${echapper(a.acces)}</p>` : ''}
@@ -67,7 +70,8 @@ async function vueTournee(idTech, jourDemande) {
           ${a.adresse || a.lat != null ? `<a class="bouton secondaire" href="${itineraire(a)}" rel="noopener">Y aller</a>` : ''}
           ${a.telephone ? `<a class="bouton secondaire" href="tel:${a.telephone.replace(/[^\d+]/g, '')}">Appeler</a>` : ''}
         </div>
-      </div></li>`).join('')}</ol>` : `<p class="vide">Aucun client prévu le ${JOURS[jour].toLowerCase()}.${pilote ? ' Attribuez un technicien et un jour depuis la fiche d\'un client.' : ''}</p>`}`;
+      </div></li>`).join('')}</ol>` : d.absent ? '' : `<p class="vide">Aucun client prévu le ${JOURS[jour].toLowerCase()}.${pilote ? ' Attribuez un technicien et un jour depuis la fiche d\'un client.' : ''}</p>`}
+    ${vueMesure(d.mesure)}`;
 
   const sel = document.getElementById('tech');
   if (sel) sel.addEventListener('change', () => aller('#/tournee/' + sel.value + '/' + jour));
@@ -80,6 +84,21 @@ async function vueTournee(idTech, jourDemande) {
   });
   const apercu = document.getElementById('apercu');
   if (apercu) apercu.addEventListener('click', () => { dessinerCarte(d, true); document.getElementById('carte').scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+}
+
+// Le temps entre deux rapports : l'intervention et le trajet qui l'a précédée. Rien d'autre n'est relevé,
+// et le technicien voit exactement ce que voit son responsable : une mesure qu'on cache devient une surveillance.
+function vueMesure(m) {
+  if (!m || m.rapports < 2) return '';
+  return `<h2>Le temps entre les rapports</h2>
+    <p class="aide">Mesuré à partir de l'heure des rapports : aucune position, aucun suivi en direct. Sert à équilibrer les journées et à ajuster les durées prévues, jamais à comparer les personnes.</p>
+    <div class="resume"><div><strong>${m.rapports}</strong> rapports</div>
+      <div>Journée de <strong>${heures(m.amplitude_min)}</strong>, de la première intervention au dernier rapport</div>
+      ${m.ecart_moyen_min !== null ? `<div>En moyenne <strong>${heures(m.ecart_moyen_min)}</strong> d'un rapport à l'autre, trajet compris</div>` : ''}</div>
+    <div class="table-defile"><table><thead><tr><th>Arrêt</th><th>Depuis le rapport précédent</th><th>Dont sur place</th><th>Dont trajet</th></tr></thead>
+      <tbody>${m.ecarts.map((e) => e.pause
+        ? `<tr><td>${echapper(e.client)}</td><td colspan="3" class="sous">${heures(e.ecart_min)} : pause ou coupure, non comptée</td></tr>`
+        : `<tr><td>${echapper(e.client)}</td><td><strong>${heures(e.ecart_min)}</strong></td><td>${e.sur_place_min !== null ? heures(e.sur_place_min) : '–'}</td><td>${e.trajet_min !== null ? heures(e.trajet_min) : '–'}</td></tr>`).join('')}</tbody></table></div>`;
 }
 
 function dessinerCarte(d, avecPropose = false) {
@@ -126,10 +145,11 @@ async function vueCharge(agence) {
       <thead><tr><th>Technicien</th>${Object.values(d.jours).map((j) => `<th>${j.slice(0, 3)}</th>`).join('')}<th>Semaine</th></tr></thead>
       <tbody>${d.techniciens.map((t) => {
         const total = Object.values(t.jours).reduce((s, j) => s + j.charge_min, 0);
-        return `<tr><td>${echapper(t.nom)}</td>${Object.entries(t.jours).map(([j, x]) => `<td class="jour-${niveauJour(x)}"><a href="#/tournee/${t.id}/${j}">${x.visites ? `${x.visites} arrêt${x.visites > 1 ? 's' : ''} · ${x.piscines} pisc.<br><strong>${heures(x.charge_min)}</strong>` : '–'}</a></td>`).join('')}<td><strong>${heures(total)}</strong><br><span class="sous">${Math.round(total / (5 * d.seuils.cible) * 100)} %</span></td></tr>`;
+        return `<tr><td>${echapper(t.nom)}</td>${Object.entries(t.jours).map(([j, x]) => `<td class="jour-${x.absent ? 'absent' : niveauJour(x)}"><a href="#/tournee/${t.id}/${j}">${x.absent ? 'Absent' : x.visites ? `${x.visites} arrêt${x.visites > 1 ? 's' : ''} · ${x.piscines} pisc.<br><strong>${heures(x.charge_min)}</strong>` : '–'}${x.mesure_min ? `<br><span class="sous">mesuré ${heures(x.mesure_min)}</span>` : ''}</a></td>`).join('')}<td><strong>${heures(total)}</strong><br><span class="sous">${Math.round(total / (5 * d.seuils.cible) * 100)} %</span></td></tr>`;
       }).join('') || '<tr><td colspan="8">Aucun technicien actif.</td></tr>'}</tbody>
     </table></div>
-    <p class="legende-charge"><span class="jour-legere">creuse : moins de 5 h</span> <span class="jour-bonne">5 à 6 h 30</span> <span class="jour-pleine">6 h 30 à 7 h 30</span> <span class="jour-lourde">trop : plus de 7 h 30 ou plus de 10 piscines</span></p>
+    <p class="legende-charge"><span class="jour-legere">creuse : moins de 5 h</span> <span class="jour-bonne">5 à 6 h 30</span> <span class="jour-pleine">6 h 30 à 7 h 30</span> <span class="jour-lourde">trop : plus de 7 h 30 ou plus de 10 piscines</span> <span class="jour-absent">absent</span></p>
+    <p class="aide">« Mesuré » : la journée telle que les rapports l'ont horodatée, pour les jours déjà passés. Quand l'écart avec la charge prévue dure plusieurs semaines, ce sont les durées prévues qu'on corrige.</p>
     <h2>Les piscines les plus longues <span class="aide">médiane des passages mesurés sur quatre mois</span></h2>
     ${l.ok && l.clients.length ? `<div class="table-defile"><table><thead><tr><th>Client</th><th>Jour</th><th>Technicien</th><th>Durée</th><th>Visites lourdes</th></tr></thead>
       <tbody>${l.clients.map((c) => `<tr><td><a href="#/client/${c.id}">${echapper(c.nom)}</a> <span class="sous">${echapper(c.commune)}</span></td><td>${echapper(c.jour)}</td><td>${echapper(c.technicien || '–')}</td><td><strong>${c.mediane} min</strong></td><td>${c.lourdes} sur ${c.visites}</td></tr>`).join('')}</tbody></table></div>`

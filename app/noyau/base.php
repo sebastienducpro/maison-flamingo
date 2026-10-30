@@ -11,7 +11,7 @@ date_default_timezone_set('Europe/Paris');
 // Un avertissement glissé dans une réponse casse le JSON et peut montrer un chemin du serveur.
 ini_set('display_errors', '0');
 
-const VERSION_SCHEMA = 7;
+const VERSION_SCHEMA = 8;
 const TAILLE_PHOTO_MAX = 4000000;
 const PHOTOS_MAX = 6;
 const EXPEDITEUR = 'contact@maisonflamingo.fr';
@@ -48,6 +48,12 @@ const JOURNEE_CIBLE_MIN = 420;   // sept heures
 const JOURNEE_MAX_MIN = 450;     // sept heures et demie, jamais au-delà
 const JOURNEE_CREUSE_MIN = 300;  // moins de cinq heures : une journée à regrouper ou à remplir
 const PISCINES_JOUR_MAX = 10;    // même dans le temps, au-delà c'est trop physique
+// Ce qu'on vérifie avant de confier une maison à un remplaçant. Tant qu'une case manque, il n'entre chez personne.
+const VIVIER_CONTROLES = ['entretien' => 'Entretien en personne', 'casier' => 'Extrait de casier judiciaire vu', 'permis' => 'Permis B vu',
+    'essai' => 'Journée d\'essai en binôme', 'securite' => 'Sécurité des produits expliquée', 'cles' => 'Règles des clés signées'];
+const MISSION_JOURS_MAX = 92;     // un accès temporaire ne dure jamais plus d'une saison
+// Au-delà, l'écart entre deux rapports contient une pause : il ne compte pas dans les moyennes.
+const ECART_PAUSE_MIN = 90;
 const VITESSE_KMH = 35;          // moyenne en périphérie nîmoise, feux et lotissements compris
 const DETOUR_ROUTE = 1.3;        // la route fait environ 30 % de plus que le vol d'oiseau
 const ESSAIS_IP = 10;        // échecs de connexion par quart d'heure et par adresse
@@ -261,6 +267,21 @@ function migrer(PDO $db): void
     $db->exec("
         CREATE TABLE IF NOT EXISTS pilotage_saisies (id INTEGER PRIMARY KEY, mois TEXT NOT NULL, agence_id INTEGER NOT NULL DEFAULT 0, cle TEXT NOT NULL,
             valeur REAL NOT NULL, saisi_par TEXT NOT NULL DEFAULT '', saisi_le TEXT NOT NULL, UNIQUE(mois, agence_id, cle));
+    ");
+    // Version 8 : les absences, les remplacements d'un jour, le vivier de remplaçants et leurs accès qui s'éteignent seuls.
+    ajouter_colonne($db, 'utilisateurs', 'expire_le', 'TEXT');
+    ajouter_colonne($db, 'utilisateurs', 'vivier_id', 'INTEGER');
+    $db->exec("
+        CREATE TABLE IF NOT EXISTS absences (id INTEGER PRIMARY KEY, utilisateur_id INTEGER NOT NULL REFERENCES utilisateurs(id), du TEXT NOT NULL, au TEXT NOT NULL,
+            motif TEXT NOT NULL DEFAULT '', cree_par TEXT NOT NULL DEFAULT '', cree_le TEXT NOT NULL);
+        CREATE INDEX IF NOT EXISTS i_absences ON absences(utilisateur_id, du, au);
+        CREATE TABLE IF NOT EXISTS remplacements (id INTEGER PRIMARY KEY, date TEXT NOT NULL, client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+            technicien_id INTEGER NOT NULL REFERENCES utilisateurs(id), cree_par TEXT NOT NULL DEFAULT '', cree_le TEXT NOT NULL, UNIQUE(date, client_id));
+        CREATE INDEX IF NOT EXISTS i_remplacements ON remplacements(technicien_id, date);
+        CREATE TABLE IF NOT EXISTS vivier (id INTEGER PRIMARY KEY, agence_id INTEGER NOT NULL REFERENCES agences(id), prenom TEXT NOT NULL DEFAULT '', nom TEXT NOT NULL DEFAULT '',
+            telephone TEXT NOT NULL DEFAULT '', courriel TEXT NOT NULL DEFAULT '', source TEXT NOT NULL DEFAULT '', disponibilites TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '',
+            entretien INTEGER NOT NULL DEFAULT 0, casier INTEGER NOT NULL DEFAULT 0, permis INTEGER NOT NULL DEFAULT 0, essai INTEGER NOT NULL DEFAULT 0,
+            securite INTEGER NOT NULL DEFAULT 0, cles INTEGER NOT NULL DEFAULT 0, ecarte INTEGER NOT NULL DEFAULT 0, utilisateur_id INTEGER, cree_le TEXT NOT NULL, maj_le TEXT NOT NULL);
     ");
     $version = (int) $db->query('PRAGMA user_version')->fetchColumn();
     $db->beginTransaction();

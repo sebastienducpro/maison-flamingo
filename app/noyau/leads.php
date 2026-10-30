@@ -22,7 +22,7 @@ function normaliser_commune(string $c): string
 function technicien_le_moins_charge(int $agence): ?int
 {
     $q = base()->prepare("SELECT u.id, (SELECT COUNT(*) FROM clients c WHERE c.technicien_id = u.id AND c.lead_contacte_le IS NULL AND c.lead_recu_le IS NOT NULL) AS ouverts
-        FROM utilisateurs u WHERE u.role = 'technicien' AND u.actif = 1 AND u.hash <> '' AND u.agence_id = ? ORDER BY ouverts, u.id LIMIT 1");
+        FROM utilisateurs u WHERE u.role = 'technicien' AND u.actif = 1 AND u.hash <> '' AND u.expire_le IS NULL AND u.agence_id = ? ORDER BY ouverts, u.id LIMIT 1");
     $q->execute([$agence]);
     $t = $q->fetch();
     return $t ? (int) $t['id'] : null;
@@ -188,7 +188,7 @@ function a_secteurs(): void
             $sans[$n] = $c;
         }
     }
-    $t = $db->prepare("SELECT id, nom, agence_id FROM utilisateurs WHERE role = 'technicien' AND actif = 1" . ($u['role'] === 'chef' ? ' AND agence_id = ?' : '') . ' ORDER BY nom');
+    $t = $db->prepare("SELECT id, nom, agence_id FROM utilisateurs WHERE role = 'technicien' AND actif = 1 AND expire_le IS NULL" . ($u['role'] === 'chef' ? ' AND agence_id = ?' : '') . ' ORDER BY nom');
     $t->execute($u['role'] === 'chef' ? [$u['agence_id']] : []);
     sortir(200, ['ok' => true, 'secteurs' => array_values($connues), 'sans_secteur' => array_values($sans),
         'techniciens' => $t->fetchAll(), 'agences' => $u['role'] === 'superadmin' ? $db->query('SELECT id, nom FROM agences WHERE actif = 1 ORDER BY nom')->fetchAll() : []]);

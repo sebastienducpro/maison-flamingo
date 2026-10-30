@@ -152,8 +152,8 @@ function accueilDuRole() {
 
 const MENUS = {
   technicien: [['#/tournee', 'Tournée'], ['#/leads', 'Leads'], ['#/clients', 'Clients'], ['#/demandes', 'Demandes'], ['#/compte', 'Compte']],
-  chef: [['#/tableau', 'Tableau'], ['#/pilotage', 'Pilotage'], ['#/leads', 'Leads'], ['#/tournee', 'Tournées'], ['#/charge', 'Semaine'], ['#/clients', 'Clients'], ['#/secteurs', 'Secteurs'], ['#/equipe', 'Équipe'], ['#/demandes', 'Demandes'], ['#/compte', 'Compte']],
-  superadmin: [['#/tableau', 'Tableau'], ['#/pilotage', 'Pilotage'], ['#/leads', 'Leads'], ['#/tournee', 'Tournées'], ['#/charge', 'Semaine'], ['#/clients', 'Clients'], ['#/secteurs', 'Secteurs'], ['#/equipe', 'Équipe'], ['#/agences', 'Agences'], ['#/demandes', 'Demandes'], ['#/sauvegardes', 'Sauvegardes'], ['#/journal', 'Journal'], ['#/compte', 'Compte']],
+  chef: [['#/tableau', 'Tableau'], ['#/pilotage', 'Pilotage'], ['#/leads', 'Leads'], ['#/tournee', 'Tournées'], ['#/charge', 'Semaine'], ['#/absences', 'Absences'], ['#/clients', 'Clients'], ['#/secteurs', 'Secteurs'], ['#/equipe', 'Équipe'], ['#/demandes', 'Demandes'], ['#/compte', 'Compte']],
+  superadmin: [['#/tableau', 'Tableau'], ['#/pilotage', 'Pilotage'], ['#/leads', 'Leads'], ['#/tournee', 'Tournées'], ['#/charge', 'Semaine'], ['#/absences', 'Absences'], ['#/clients', 'Clients'], ['#/secteurs', 'Secteurs'], ['#/equipe', 'Équipe'], ['#/agences', 'Agences'], ['#/demandes', 'Demandes'], ['#/sauvegardes', 'Sauvegardes'], ['#/journal', 'Journal'], ['#/compte', 'Compte']],
 };
 
 // Ce qui attend : un chiffre sur Leads et Demandes, relu toutes les minutes. L'écran rappelle, il ne décide pas.
@@ -172,7 +172,9 @@ function dessinerNav() {
   if (!nav) return;
   const menu = APP.utilisateur ? MENUS[APP.utilisateur.role] || [] : [];
   nav.hidden = !menu.length;
-  const ici = '#/' + (location.hash.slice(2).split('/')[0] || '');
+  // Le vivier est un onglet des absences : le menu reste court, l'onglet reste allumé.
+  const tete = location.hash.slice(2).split('/')[0] || '';
+  const ici = '#/' + (tete === 'vivier' ? 'absences' : tete);
   const badge = (h) => (h === '#/leads' && A_FAIRE.leads ? `<span class="badge${A_FAIRE.leads_retard ? ' retard' : ''}">${A_FAIRE.leads}</span>` : h === '#/demandes' && A_FAIRE.demandes ? `<span class="badge">${A_FAIRE.demandes}</span>` : '');
   nav.innerHTML = menu.map(([h, l]) => `<a href="${h}"${h === ici ? ' aria-current="page"' : ''}>${l}${badge(h)}</a>`).join('');
 }
@@ -198,6 +200,8 @@ async function route() {
       case 'charge': return await vueCharge(morceaux[1]);
       case 'tableau': return await vueTableau(morceaux[1]);
       case 'pilotage': return await vuePilotage(morceaux[1]);
+      case 'absences': return await vueAbsences(morceaux[1]);
+      case 'vivier': return await vueVivier(morceaux[1]);
       case 'equipe': return await vueEquipe();
       case 'agences': return await vueAgences();
       case 'demandes': return await vueDemandes();
@@ -383,7 +387,7 @@ async function vueClient(id) {
     c = r.client; d = r;
   } else if (pilote) {
     // Une fiche neuve : la direction choisit l'agence, et la liste des techniciens suit.
-    try { const e = await api('equipe'); d.techniciens = e.membres.filter((m) => m.role === 'technicien' && m.actif && (!c.agence_id || m.agence_id === c.agence_id)); d.agences = e.agences; d.tousTechniciens = e.membres; } catch (err) { /* hors ligne : la fiche s'enregistrera sans planning */ }
+    try { const e = await api('equipe'); d.techniciens = e.membres.filter((m) => m.role === 'technicien' && m.actif && !m.remplacant_jusquau && (!c.agence_id || m.agence_id === c.agence_id)); d.agences = e.agences; d.tousTechniciens = e.membres; } catch (err) { /* hors ligne : la fiche s'enregistrera sans planning */ }
   }
   APP.client = c;
   const nouveau = !c.id;
@@ -395,7 +399,7 @@ async function vueClient(id) {
     <a class="retour" href="#/clients">← Clients</a>
     ${nouveau ? '<h1>Nouveau client</h1>' : `
     <div class="tete">
-      <div><h1>${echapper((c.prenom + ' ' + c.nom).trim())}</h1><p class="sous">${[echapper(c.commune), STATUTS[c.statut], c.jour_passage ? JOURS[c.jour_passage] : '', d.duree_estimee ? 'environ ' + d.duree_estimee + ' min' : ''].filter(Boolean).join(' · ')}</p></div>
+      <div><h1>${echapper((c.prenom + ' ' + c.nom).trim())}</h1><p class="sous">${[echapper(c.commune), STATUTS[c.statut], c.jour_passage ? JOURS[c.jour_passage] : '', d.duree_estimee ? 'environ ' + d.duree_estimee + ' min sur place' : '', d.temps_reel ? d.temps_reel + ' min réelles, trajet compris' : ''].filter(Boolean).join(' · ')}</p></div>
     </div>
     ${c.lead_recu_le && !c.lead_contacte_le ? `<div class="bandeau alerte lead-ouvert"><strong>Lead reçu ${echapper(dateFr(c.lead_recu_le))}</strong>${c.origine ? ' · ' + echapper(c.origine) : ''}${c.technicien_id ? '' : ' · <strong>aucun technicien</strong>'}. Appeler ou envoyer un SMS compte comme premier contact. <button class="secondaire" id="contact-fait">Premier contact fait</button></div>`
       : c.lead_contacte_le ? `<p class="aide">Lead du ${echapper(dateFr(c.lead_recu_le, false))}, premier contact ${echapper(dateFr(c.lead_contacte_le))} par ${echapper(c.lead_contact_par)}.</p>` : ''}

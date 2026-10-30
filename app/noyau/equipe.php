@@ -429,9 +429,9 @@ function a_client(): void
     $cc = $db->prepare('SELECT courriel, actif, derniere_connexion FROM comptes_clients WHERE client_id = ?');
     $cc->execute([$c['id']]);
     $compte = $cc->fetch() ?: null;
-    $plus = ['visites' => $visites, 'demandes' => $dm->fetchAll(), 'compte' => $compte, 'duree_estimee' => estimer_durees([(int) $c['id']], 'passage', [(int) $c['id'] => $c['formule']])[(int) $c['id']]];
+    $plus = ['visites' => $visites, 'demandes' => $dm->fetchAll(), 'compte' => $compte, 'duree_estimee' => estimer_durees([(int) $c['id']], 'passage', [(int) $c['id'] => $c['formule']])[(int) $c['id']], 'temps_reel' => temps_reel_client((int) $c['id'])];
     if (in_array($u['role'], ['chef', 'superadmin'], true)) {
-        $t = $db->prepare("SELECT id, nom FROM utilisateurs WHERE role = 'technicien' AND actif = 1 AND agence_id = ? ORDER BY nom");
+        $t = $db->prepare("SELECT id, nom FROM utilisateurs WHERE role = 'technicien' AND actif = 1 AND expire_le IS NULL AND agence_id = ? ORDER BY nom");
         $t->execute([$c['agence_id']]);
         $plus['techniciens'] = $t->fetchAll();
     }
@@ -446,7 +446,8 @@ function technicien_valable(int $id, int $agence): ?int
     if ($id <= 0) {
         return null;
     }
-    $q = base()->prepare("SELECT id FROM utilisateurs WHERE id = ? AND role = 'technicien' AND actif = 1 AND agence_id = ?");
+    // Un remplaçant temporaire ne devient jamais le technicien attitré d'un client.
+    $q = base()->prepare("SELECT id FROM utilisateurs WHERE id = ? AND role = 'technicien' AND actif = 1 AND agence_id = ? AND expire_le IS NULL");
     $q->execute([$id, $agence]);
     return $q->fetchColumn() !== false ? $id : null;
 }
@@ -798,7 +799,7 @@ function a_tournee(): void
     if ($jour < 1 || $jour > 7) {
         $jour = (int) date('N');
     }
-    sortir(200, ['ok' => true] + bilan_journee($t, $jour));
+    sortir(200, ['ok' => true] + bilan_journee($t, $jour, date_du_jour_semaine($jour)));
 }
 
 function a_tournee_ordonner(): void
@@ -838,15 +839,17 @@ function a_charge(): void
     // La semaine de chaque technicien, jour par jour, en heures et non en nombre de visites.
     $u = exiger_equipe(['chef', 'superadmin']);
     $agence = agence_visee($u) ?? (int) base()->query('SELECT MIN(id) FROM agences')->fetchColumn();
-    $q = base()->prepare("SELECT id, nom, agence_id FROM utilisateurs WHERE role = 'technicien' AND actif = 1 AND agence_id = ? ORDER BY nom");
+    $q = base()->prepare("SELECT id, nom, agence_id FROM utilisateurs WHERE role = 'technicien' AND actif = 1 AND expire_le IS NULL AND agence_id = ? ORDER BY nom");
     $q->execute([$agence]);
     $lignes = [];
     foreach ($q->fetchAll() as $t) {
         $jours = [];
         for ($j = 1; $j <= 6; $j++) {
-            $b = bilan_journee($t, $j);
+            // La semaine en cours, absences et remplacements compris, et ce qui a été mesuré les jours passés.
+            $b = bilan_journee($t, $j, date_du_jour_semaine($j));
             $jours[$j] = ['visites' => count($b['arrets']), 'total_min' => $b['propose']['total_min'], 'sur_place_min' => $b['actuel']['sur_place_min'], 'trajet_min' => $b['propose']['trajet_min'],
-                'charge_min' => $b['charge']['min'], 'piscines' => $b['charge']['piscines'], 'niveau' => $b['charge']['niveau']];
+                'charge_min' => $b['charge']['min'], 'piscines' => $b['charge']['piscines'], 'niveau' => $b['charge']['niveau'],
+                'absent' => $b['absent'] !== null, 'date' => $b['date'], 'mesure_min' => $b['mesure'] && $b['mesure']['rapports'] ? $b['mesure']['amplitude_min'] : null];
         }
         $lignes[] = ['id' => (int) $t['id'], 'nom' => $t['nom'], 'jours' => $jours];
     }
@@ -914,7 +917,7 @@ function a_geocoder_manquants(): void
 function a_equipe(): void
 {
     $u = exiger_equipe(['chef', 'superadmin']);
-    $sql = "SELECT u.id, u.nom, u.courriel, u.telephone, u.photo, u.role, u.agence_id, u.actif, u.totp_actif, u.derniere_connexion, u.hash = '' AS en_attente, a.nom AS agence,
+    $sql = "SELECT u.id, u.nom, u.courriel, u.telephone, u.photo, u.role, u.agence_id, u.actif, u.totp_actif, u.derniere_connexion, u.hash = '' AS en_attente, u.expire_le, a.nom AS agence,
             (SELECT COUNT(*) FROM clients c WHERE c.technicien_id = u.id AND c.statut IN ('client', 'prospect', 'veille')) AS clients,
             (SELECT COUNT(*) FROM secteurs s WHERE s.technicien_id = u.id) AS secteurs
         FROM utilisateurs u LEFT JOIN agences a ON a.id = u.agence_id";
@@ -930,6 +933,8 @@ function a_equipe(): void
         'clients' => (int) $m['clients'], 'secteurs' => (int) $m['secteurs'],
         'agence_id' => $m['agence_id'] !== null ? (int) $m['agence_id'] : null, 'actif' => (int) $m['actif'] === 1,
         'double_facteur' => (int) $m['totp_actif'] === 1, 'derniere_connexion' => $m['derniere_connexion'], 'en_attente' => (int) $m['en_attente'] === 1,
+        // Un remplaçant du vivier : son accès a une date de fin, et il n'est titulaire de personne.
+        'remplacant_jusquau' => $m['expire_le'],
     ], $q->fetchAll()), 'agences' => $agences]);
 }
 
@@ -1190,7 +1195,7 @@ function a_tableau(): void
             $detail[] = ['id' => (int) $a['id'], 'nom' => $a['nom'], 'clients' => (int) $x[0], 'visites_30j' => (int) $x[1], 'prevus' => (int) $x[2], 'faits' => (int) $x[3], 'demandes' => (int) $x[4]];
         }
     } else {
-        $t = $db->prepare("SELECT id, nom FROM utilisateurs WHERE role = 'technicien' AND actif = 1 AND agence_id = ? ORDER BY nom");
+        $t = $db->prepare("SELECT id, nom FROM utilisateurs WHERE role = 'technicien' AND actif = 1 AND expire_le IS NULL AND agence_id = ? ORDER BY nom");
         $t->execute([$agence]);
         foreach ($t->fetchAll() as $m) {
             $x = $un("SELECT (SELECT COUNT(*) FROM clients WHERE technicien_id = ? AND statut IN ('client', 'prospect', 'veille')),

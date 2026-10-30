@@ -227,3 +227,17 @@ table.pilotage td:nth-child(3){min-width:104px}
 table.pilotage td.valeur{white-space:nowrap;font-weight:600;color:var(--violet)}
 .saisie-groupe{border:1px solid var(--sable);border-radius:12px;padding:10px 14px;margin:10px 0;display:grid;gap:10px}
 .saisie-groupe legend{font-weight:600;padding:0 6px}
+
+/* Absences et vivier : une case à cocher garde 44 px de haut, on la coche avec un pouce mouillé. */
+label.case{flex-direction:row;align-items:center;gap:10px;min-height:44px;margin:0}
+.case input{flex:none;width:22px;height:22px;min-height:0;padding:0;margin:0;accent-color:var(--turquoise)}
+.onglets a{flex:0 1 160px}
+.couverture{margin-bottom:12px;display:grid;gap:10px}
+.clients-couverts{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.clients-couverts li{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
+.couverture select{flex:1 1 220px;min-width:0}
+.liste li.membre details summary{cursor:pointer;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;min-height:44px}
+.liste li.membre details summary .sous{flex-basis:100%}
+.fiche-vivier{display:grid;gap:10px;margin-top:12px}
+.mission{border-top:1px solid var(--sable);padding-top:12px;display:grid;gap:10px}
+.jour-absent{background:#ECE7F2;color:var(--gris)}

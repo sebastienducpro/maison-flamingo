@@ -144,14 +144,88 @@ function depart_agence(?int $agence_id): ?array
     return ($a && $a['lat'] !== null) ? ['nom' => $a['nom'], 'adresse' => $a['adresse'], 'lat' => (float) $a['lat'], 'lon' => (float) $a['lon']] : null;
 }
 
+// La date d'un jour de la semaine en cours (lundi = 1), pour appliquer les absences et les remplacements.
+function date_du_jour_semaine(int $jour): string
+{
+    return date('Y-m-d', strtotime('today -' . ((int) date('N') - 1) . ' days +' . ($jour - 1) . ' days'));
+}
+
+function absent_le(int $utilisateur, string $date): ?array
+{
+    $q = base()->prepare('SELECT * FROM absences WHERE utilisateur_id = ? AND du <= ? AND au >= ? LIMIT 1');
+    $q->execute([$utilisateur, $date, $date]);
+    return $q->fetch() ?: null;
+}
+
+// Le temps réel d'une journée, lu sur l'heure des rapports : l'écart entre deux rapports, c'est l'intervention
+// et le trajet qui l'a précédée. Ni position ni suivi en direct : seulement l'heure que le rapport porte déjà.
+// Sert à équilibrer les journées et à estimer les durées, jamais à comparer ou sanctionner les personnes.
+function mesure_journee(int $utilisateur, string $date): array
+{
+    $q = base()->prepare("SELECT v.client_id, v.quand, v.duree_min, c.prenom, c.nom FROM visites v JOIN clients c ON c.id = v.client_id
+        WHERE v.technicien_id = ? AND substr(v.quand, 1, 10) = ? ORDER BY v.quand");
+    $q->execute([$utilisateur, $date]);
+    $v = $q->fetchAll();
+    $ecarts = [];
+    for ($i = 1; $i < count($v); $i++) {
+        $min = (int) round((strtotime($v[$i]['quand']) - strtotime($v[$i - 1]['quand'])) / 60);
+        $ecarts[] = ['client_id' => (int) $v[$i]['client_id'], 'client' => trim($v[$i]['prenom'] . ' ' . $v[$i]['nom']), 'ecart_min' => $min,
+            'sur_place_min' => $v[$i]['duree_min'] !== null ? (int) $v[$i]['duree_min'] : null,
+            'trajet_min' => $v[$i]['duree_min'] !== null && $min <= ECART_PAUSE_MIN ? max(0, $min - (int) $v[$i]['duree_min']) : null,
+            'pause' => $min > ECART_PAUSE_MIN];
+    }
+    $utiles = array_values(array_filter($ecarts, fn ($e) => !$e['pause']));
+    $debut = $v ? strtotime($v[0]['quand']) - 60 * (int) ($v[0]['duree_min'] ?? 0) : null;
+    return ['rapports' => count($v),
+        'amplitude_min' => $v ? (int) round((strtotime($v[count($v) - 1]['quand']) - $debut) / 60) : 0,
+        'ecart_moyen_min' => $utiles ? (int) round(array_sum(array_column($utiles, 'ecart_min')) / count($utiles)) : null,
+        'ecarts' => $ecarts];
+}
+
+// Le temps réel d'un client, trajet compris : la médiane des écarts entre le rapport précédent du même technicien,
+// le même jour, et le sien. Il dit ce que ce client coûte vraiment dans une journée, mieux que la durée sur place seule.
+function temps_reel_client(int $client): ?int
+{
+    $q = base()->prepare("SELECT v.quand, v.technicien_id,
+            (SELECT p.quand FROM visites p WHERE p.technicien_id = v.technicien_id AND substr(p.quand, 1, 10) = substr(v.quand, 1, 10) AND p.quand < v.quand ORDER BY p.quand DESC LIMIT 1) AS avant
+        FROM visites v WHERE v.client_id = ? AND v.type = 'passage' AND v.technicien_id IS NOT NULL ORDER BY v.quand DESC LIMIT 8");
+    $q->execute([$client]);
+    $ecarts = [];
+    foreach ($q->fetchAll() as $l) {
+        if ($l['avant']) {
+            $min = (int) round((strtotime($l['quand']) - strtotime($l['avant'])) / 60);
+            if ($min > 0 && $min <= ECART_PAUSE_MIN) {
+                $ecarts[] = $min;
+            }
+        }
+    }
+    if (count($ecarts) < 2) {
+        return null;
+    }
+    sort($ecarts);
+    return $ecarts[intdiv(count($ecarts), 2)];
+}
+
 // Le bilan d'une journée : arrêts dans l'ordre enregistré, ordre proposé, et ce que chacun coûte en minutes.
-function bilan_journee(array $technicien, int $jour): array
+// Avec une date : un technicien absent n'a pas de tournée, et les clients confiés pour ce jour s'ajoutent.
+function bilan_journee(array $technicien, int $jour, ?string $date = null): array
 {
     $db = base();
-    $q = $db->prepare("SELECT id, prenom, nom, telephone, adresse, commune, lat, lon, acces, formule, statut, ordre FROM clients
-        WHERE technicien_id = ? AND jour_passage = ? AND statut = 'client' ORDER BY ordre, id");
-    $q->execute([(int) $technicien['id'], $jour]);
-    $clients = $q->fetchAll();
+    $absence = $date ? absent_le((int) $technicien['id'], $date) : null;
+    $clients = [];
+    if (!$absence) {
+        $q = $db->prepare("SELECT id, prenom, nom, telephone, adresse, commune, lat, lon, acces, formule, statut, ordre, NULL AS remplace FROM clients c
+            WHERE technicien_id = ? AND jour_passage = ? AND statut = 'client'" . ($date ? ' AND NOT EXISTS (SELECT 1 FROM remplacements r WHERE r.client_id = c.id AND r.date = ? AND r.technicien_id <> c.technicien_id)' : '') . ' ORDER BY ordre, id');
+        $q->execute($date ? [(int) $technicien['id'], $jour, $date] : [(int) $technicien['id'], $jour]);
+        $clients = $q->fetchAll();
+    }
+    if ($date) {
+        $q = $db->prepare("SELECT c.id, c.prenom, c.nom, c.telephone, c.adresse, c.commune, c.lat, c.lon, c.acces, c.formule, c.statut, c.ordre, t.nom AS remplace
+            FROM remplacements r JOIN clients c ON c.id = r.client_id LEFT JOIN utilisateurs t ON t.id = c.technicien_id
+            WHERE r.technicien_id = ? AND r.date = ? AND (c.technicien_id IS NULL OR c.technicien_id <> r.technicien_id) ORDER BY c.ordre, c.id");
+        $q->execute([(int) $technicien['id'], $date]);
+        $clients = array_merge($clients, $q->fetchAll());
+    }
     $ids = array_map(fn ($c) => (int) $c['id'], $clients);
     $durees = estimer_durees($ids, 'passage', array_combine($ids, array_map(fn ($c) => $c['formule'], $clients)) ?: []);
     $aujourdhui = date('Y-m-d');
@@ -178,6 +252,7 @@ function bilan_journee(array $technicien, int $jour): array
             'adresse' => $c['adresse'], 'commune' => $c['commune'], 'acces' => $c['acces'], 'formule' => $c['formule'],
             'lat' => $c['lat'] !== null ? (float) $c['lat'] : null, 'lon' => $c['lon'] !== null ? (float) $c['lon'] : null,
             'duree' => $durees[(int) $c['id']], 'fait' => isset($faits[$c['id']]), 'charge' => $charges[$c['id']] ?? '',
+            'remplace' => $c['remplace'] ?? null,
         ];
     }
     $places = array_values(array_filter($arrets, fn ($a) => $a['lat'] !== null));
@@ -188,6 +263,8 @@ function bilan_journee(array $technicien, int $jour): array
     $sans_position = array_values(array_filter($arrets, fn ($a) => $a['lat'] === null));
     return [
         'jour' => $jour, 'jour_nom' => JOURS[$jour] ?? '', 'technicien' => ['id' => (int) $technicien['id'], 'nom' => $technicien['nom']],
+        'date' => $date, 'absent' => $absence ? ['du' => $absence['du'], 'au' => $absence['au'], 'motif' => $absence['motif']] : null,
+        'mesure' => $date && $date <= date('Y-m-d') ? mesure_journee((int) $technicien['id'], $date) : null,
         'depart' => $depart, 'arrets' => $arrets,
         'actuel' => ['km' => round($km_actuel, 1), 'trajet_min' => minutes_route($km_actuel), 'sur_place_min' => $sur_place, 'total_min' => $sur_place + minutes_route($km_actuel)],
         'propose' => [
