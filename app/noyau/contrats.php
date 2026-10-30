@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 const RETRACTATION_JOURS = 14;          // article L221-18 du Code de la consommation
 const RAPPEL_RECONDUCTION = [30, 90];   // article L215-1 : prévenir entre trois mois et un mois avant l'échéance
-const MODELE_CONTRAT = 'v3 du 30 octobre 2026';
+const MODELE_CONTRAT = 'v4 du 30 octobre 2026';
 // La taille du bassin fixe le prix avant la signature : on la mesure au diagnostic, on ne la découvre pas en cours de saison.
 const SURFACE_BASE_M2 = 50;          // jusqu'à 50 m² d'eau (environ 10 × 5 m) : le prix de la formule
 const SURFACE_MAJOREE_M2 = 80;       // de 50 à 80 m² : la majoration ; au-delà, ou à débordement : sur devis
@@ -43,8 +43,11 @@ const PARAMETRES_COMMUNS = [
 const REVISION_PARTS = ['fixe' => 0.15, 'travail' => 0.70, 'produits' => 0.15];
 
 const SERVICES_FORMULE = [
-    'Piscine' => 'un passage hebdomadaire d\'avril à octobre par le même technicien, le même jour ; l\'hivernage et la remise en route ; les produits et les analyses d\'eau ; un rapport photo après chaque passage ; le dépannage de l\'eau en saison.',
-    'Piscine équipée, quinzaine hors été' => 'pour une piscine équipée d\'automatismes : un passage chaque semaine en juin, juillet et août, tous les quinze jours d\'avril à mai et de septembre à octobre ; le contrôle des équipements (électrolyseur, régulation, sondes, robot, volet) noté dans le carnet ; l\'hivernage et la remise en route ; les produits et les analyses d\'eau ; un rapport photo après chaque passage. Aucun réglage n\'est modifié sans l\'accord du client.',
+    // Le calendrier écrit est celui qui se compte : environ 36 passages par an pour la Piscine, 28 pour la Quinzaine.
+    'Piscine' => 'un passage chaque semaine d\'avril à octobre par le même technicien, le même jour ; un passage toutes les deux semaines en mars et en novembre ; la remise en route en mars et l\'hivernage fin novembre ; un contrôle en janvier ; les produits et les analyses d\'eau ; un rapport photo après chaque passage ; le dépannage de l\'eau en saison.',
+    // L'écart de quinze jours ne tient que parce que l'automatisme entretient l'eau entre deux passages : sans lui, la
+    // formule ne se propose pas. Une panne entre deux passages n'est pas comprise, sinon la Quinzaine coûterait une Piscine.
+    'Piscine équipée, quinzaine hors été' => 'pour une piscine équipée d\'un traitement automatique (électrolyseur ou chloration automatique) et d\'une régulation du pH, vérifiés au diagnostic : un passage chaque semaine en juin, juillet et août ; un passage toutes les deux semaines en mars, avril, mai, septembre, octobre et novembre ; la remise en route en mars et l\'hivernage fin novembre ; un contrôle en janvier ; à chaque passage, le contrôle des équipements (électrolyseur, régulation, sondes, robot, volet) noté dans le carnet ; les produits et les analyses d\'eau ; un rapport photo après chaque passage. Aucun réglage n\'est modifié sans l\'accord du client. Un passage supplémentaire entre deux passages prévus, demandé par le client (eau trouble ou verte, panne d\'un équipement), est facturé au tarif du dépannage en vigueur, 99 € TTC à ce jour, pièces en sus, sauf si le désordre vient de notre intervention.',
     'Maison' => 'environ dix à douze heures d\'intervention par an, surtout d\'automne au printemps : petits travaux de jardinage (feuilles, taille, massifs) ; petit bricolage, deux heures au plus par intervention (purge des radiateurs, joints, huisseries, graissage, bouches d\'aération) ; vigilance de la maison. Chaque intervention est datée, décrite et photographiée dans le carnet de la maison.',
     'Maison renforcée' => 'environ deux heures d\'intervention par mois : petits travaux de jardinage (feuilles, taille, massifs) ; petit bricolage, deux heures au plus par intervention (purge des radiateurs, joints, huisseries, graissage, bouches d\'aération) ; vigilance de la maison. Chaque intervention est datée, décrite et photographiée dans le carnet de la maison.',
     'Veille de résidence' => 'une visite mensuelle complète de la maison inoccupée ; un passage après un épisode de vent ou de pluie exceptionnel ; un rapport photo après chaque visite.',
