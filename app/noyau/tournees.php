@@ -55,9 +55,8 @@ function estimer_durees(array $ids, string $type = 'passage', array $formules = 
         return $sortie;
     }
     $marques = implode(',', array_fill(0, count($ids), '?'));
-    // Les huit dernières par client, triées par la base : remonter tout l'historique coûtait cher passé deux ans de visites.
-    $q = base()->prepare("SELECT client_id, duree_min FROM (SELECT client_id, duree_min, ROW_NUMBER() OVER (PARTITION BY client_id ORDER BY quand DESC) AS rang
-        FROM visites WHERE client_id IN ($marques) AND type = ? AND duree_min IS NOT NULL AND quand >= ?) WHERE rang <= 8");
+    // SQL simple, sans fonction de fenêtre : la version de SQLite de l'hébergeur n'est pas connue.
+    $q = base()->prepare("SELECT client_id, duree_min FROM visites WHERE client_id IN ($marques) AND type = ? AND duree_min IS NOT NULL AND quand >= ? ORDER BY quand DESC");
     // Bornée à l'année écoulée : le coût reste le même après dix ans de visites, et une durée vieille d'un an ne dit plus rien.
     $q->execute([...$ids, $type, date('Y-m-d', strtotime('-365 days'))]);
     $par = [];
@@ -243,8 +242,8 @@ function bilan_journee(array $technicien, int $jour, ?string $date = null): arra
         foreach ($v->fetchAll(PDO::FETCH_COLUMN) as $id) {
             $faits[$id] = true;
         }
-        $v = $db->prepare("SELECT client_id, charge FROM (SELECT client_id, charge, ROW_NUMBER() OVER (PARTITION BY client_id ORDER BY quand DESC) AS rang
-            FROM visites WHERE client_id IN ($marques) AND charge <> '' AND quand >= ?) WHERE rang = 1");
+        $v = $db->prepare("SELECT v.client_id, v.charge FROM visites v WHERE v.client_id IN ($marques) AND v.charge <> ''
+            AND v.quand = (SELECT MAX(w.quand) FROM visites w WHERE w.client_id = v.client_id AND w.charge <> '' AND w.quand >= ?)");
         $v->execute([...$ids, date('Y-m-d', strtotime('-365 days'))]);
         foreach ($v->fetchAll() as $l) {
             $charges[$l['client_id']] = $l['charge'];
