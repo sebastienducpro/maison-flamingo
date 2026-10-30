@@ -11,7 +11,7 @@ date_default_timezone_set('Europe/Paris');
 // Un avertissement glissé dans une réponse casse le JSON et peut montrer un chemin du serveur.
 ini_set('display_errors', '0');
 
-const VERSION_SCHEMA = 11;
+const VERSION_SCHEMA = 12;
 const TAILLE_PHOTO_MAX = 4000000;
 const PHOTOS_MAX = 6;
 const EXPEDITEUR = 'contact@maisonflamingo.fr';
@@ -331,6 +331,12 @@ function migrer(PDO $db): void
             statut TEXT NOT NULL DEFAULT 'emise', cree_par TEXT NOT NULL DEFAULT '', paiement TEXT, prelevement_le TEXT, paye_le TEXT, rejet_motif TEXT NOT NULL DEFAULT '',
             UNIQUE(contrat_id, periode));
     ");
+    // Version 12 : le prix d'un contrat se compose (formule, taille du bassin, devis) et se paie au mois ou à l'année.
+    foreach (['prix_base' => 'REAL', 'surface_m2' => 'REAL', 'debordement' => 'INTEGER NOT NULL DEFAULT 0', 'majoration_pct' => 'REAL NOT NULL DEFAULT 0',
+        'sur_devis' => 'INTEGER NOT NULL DEFAULT 0', 'modalite' => "TEXT NOT NULL DEFAULT 'mensuel'", 'mois_payants' => 'INTEGER', 'montant_annuel' => 'REAL',
+        'indice_travail_ref' => 'TEXT', 'indice_travail_periode' => 'TEXT', 'indice_produits_ref' => 'TEXT', 'indice_produits_periode' => 'TEXT'] as $col => $def) {
+        ajouter_colonne($db, 'contrats', $col, $def);
+    }
     $version = (int) $db->query('PRAGMA user_version')->fetchColumn();
     $db->beginTransaction();
     // Une base de la première version a un seul compte, le gérant : il devient la direction,

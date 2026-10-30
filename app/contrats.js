@@ -15,20 +15,28 @@ async function blocContrat(c) {
   zoneContrat.innerHTML = `
     <h2>Contrat</h2>
     <div class="carte">
-      ${d.contrats.length ? `<ul class="liste">${d.contrats.map((k) => `<li class="membre"><div class="reco-tete"><strong>${echapper(k.numero)}</strong> <span>${echapper(k.formule)} · ${euros(k.prix_mensuel)} par mois${k.fondateur ? ' · fondateur' : ''}</span>${pastilleDe(STATUTS_CONTRAT[k.statut])}</div>
+      ${d.contrats.length ? `<ul class="liste">${d.contrats.map((k) => `<li class="membre"><div class="reco-tete"><strong>${echapper(k.numero)}</strong> <span>${echapper(k.formule)} · ${k.modalite === 'annuel' ? euros(k.montant_annuel) + ' par an' : euros(k.prix_mensuel) + ' par mois'}${k.majoration_pct ? (k.sur_devis ? ' · sur devis' : ' · +' + k.majoration_pct + ' % grand bassin') : ''}${k.fondateur ? ' · fondateur' : ''}</span>${pastilleDe(STATUTS_CONTRAT[k.statut])}</div>
         <span class="sous">${[k.signe_le ? 'signé le ' + dateFr(k.signe_le) + ' par ' + k.signe_nom : 'préparé le ' + dateFr(k.cree_le, false), 'début le ' + dateCourte(k.debut),
           k.echeance && k.statut === 'signe' ? 'échéance le ' + dateCourte(k.echeance) + (k.rappel_le ? ', rappel envoyé le ' + dateFr(k.rappel_le, false) : '') : '',
-          k.resiliation_effet ? 'résiliation effective le ' + dateCourte(k.resiliation_effet) : ''].filter(Boolean).map(echapper).join(' · ')}</span>
+          k.resiliation_effet ? 'résiliation effective le ' + dateCourte(k.resiliation_effet) : '',
+          k.statut === 'signe' && k.prix_revise && k.prix_revise !== k.prix_mensuel ? 'prix révisé avec les derniers indices : ' + euros(k.prix_revise) + ' par mois' : ''].filter(Boolean).map(echapper).join(' · ')}</span>
         <div class="actions-ligne"><a class="bouton secondaire" href="api.php?action=contrat_document&id=${k.id}" target="_blank" rel="noopener">Voir le document</a>
           ${k.statut === 'a_signer' && d.peut_preparer ? `<button class="discret" data-annuler-contrat="${k.id}">Annuler avant signature</button>` : ''}
           ${k.statut === 'signe' && k.echeance && d.peut_preparer ? `<button class="discret" data-rappel="${k.id}">Rappel de reconduction envoyé</button>` : ''}</div></li>`).join('')}</ul>` : '<p class="aide">Aucun contrat pour ce client.</p>'}
       ${d.peut_preparer && !ouvert ? (d.manques.length
         ? `<p class="bandeau alerte">Avant le premier contrat, l'identité de la société doit être complète et le modèle relu par un juriste. Il manque : ${d.manques.map(echapper).join(', ')}. <a href="#/societe">Compléter</a></p>`
         : `<form id="preparer" class="sous-forme">
-          <div class="deux"><label>Formule<select name="formule">${Object.entries(d.tarifs).map(([f, p]) => `<option value="${echapper(f)}" data-prix="${p}"${f === formule ? ' selected' : ''}>${echapper(f)}</option>`).join('')}</select></label>
-            <label>Prix mensuel TTC<input name="prix_mensuel" type="number" step="0.01" min="1" value="${d.tarifs[formule]}"></label></div>
+          <div class="deux"><label>Formule<select name="formule">${Object.entries(d.tarifs).map(([f, p]) => `<option value="${echapper(f)}"${f === formule ? ' selected' : ''}>${echapper(f)} · ${p} € par mois</option>`).join('')}</select></label>
+            <label>Paiement<select name="modalite">${Object.entries(d.modalites).map(([k, l]) => `<option value="${k}">${echapper(l)}${k === 'annuel' ? ' (−' + d.regle.remise_pct + ' %)' : ''}</option>`).join('')}</select></label></div>
+          <div class="bassin">
+            <div class="deux"><label>Surface d'eau en m² <span class="aide">${d.surface_diagnostic ? 'mesurée au diagnostic : ' + String(d.surface_diagnostic).replace('.', ',') + ' m²' : 'longueur × largeur'}</span><input name="surface" inputmode="decimal" value="${d.surface_diagnostic ?? ''}"></label>
+              <label class="case"><input type="checkbox" name="debordement"> Bassin à débordement</label></div>
+            <p class="aide">Jusqu'à ${d.regle.base_m2} m² : prix de la formule. De ${d.regle.base_m2} à ${d.regle.majoree_m2} m² : +${d.regle.majoration_pct} %. Au-delà, ou à débordement : sur devis.</p>
+            <label class="devis" hidden>Prix mensuel sur devis, TTC<input name="prix_devis" inputmode="decimal"></label>
+          </div>
           <div class="deux"><label>Début<input name="debut" type="date" min="${dansJours(0)}" max="${dansJours(180)}" required></label>
             <label class="case"><input type="checkbox" name="fondateur"> Fondateur : prix garanti trois ans, premier mois offert, satisfait ou résilié deux mois</label></div>
+          <p class="bandeau calme" id="prix-calcule" role="status">…</p>
           <button class="principal">Préparer le contrat</button>
           <p class="aide">Le client le signe dans son espace, rubrique « Mon contrat ». Son espace doit être ouvert.</p>
           <p class="message" role="status"></p>
@@ -36,12 +44,31 @@ async function blocContrat(c) {
     </div>`;
   const f = document.getElementById('preparer');
   if (f) {
-    f.formule.addEventListener('change', () => { f.prix_mensuel.value = f.formule.selectedOptions[0].dataset.prix; });
+    const choix = () => ({ client_id: c.id, formule: f.formule.value, modalite: f.modalite.value, surface: f.surface.value.replace(',', '.'), debordement: f.debordement.checked ? 1 : '',
+      prix_devis: f.prix_devis.value.replace(',', '.'), fondateur: f.fondateur.checked ? 1 : '', debut: f.debut.value });
+    const erreurs = { champs: 'Vérifiez la formule et la date de début (dans les six mois).', surface: 'Indiquez la surface d\'eau du bassin, en m².', deja: 'Ce client a déjà un contrat à signer ou en cours.', societe: 'L\'identité de la société est incomplète.' };
+    // Le prix vient du serveur, qui seul le calcule : l'écran le redemande à chaque changement.
+    const recalculer = async () => {
+      const piscine = d.formules_piscine.includes(f.formule.value);
+      f.querySelector('.bassin').hidden = !piscine;
+      const surface = parseFloat(f.surface.value.replace(',', '.'));
+      f.querySelector('.devis').hidden = !(piscine && (f.debordement.checked || surface > d.regle.majoree_m2));
+      const { client_id, debut, ...params } = choix();
+      const t = await api('contrat_tarif', { params });
+      const z = document.getElementById('prix-calcule');
+      if (!t.ok) { z.className = 'bandeau alerte'; z.textContent = t.erreur === 'devis' ? 'Sur devis : indiquez le prix mensuel, au moins ' + t.minimum + ' €.' : erreurs[t.erreur] || 'Prix incomplet.'; return; }
+      z.className = 'bandeau calme';
+      z.textContent = (t.majoration_pct && !t.sur_devis ? 'Majoration grand bassin +' + t.majoration_pct + ' % : ' : t.sur_devis ? 'Sur devis : ' : '') + euros(t.prix_mensuel) + ' par mois'
+        + (t.modalite === 'annuel' ? ', soit ' + euros(t.montant_annuel) + ' payés d\'avance pour l\'année (' + t.mois_payants + ' mois, −' + t.remise_pct + ' %)' : '') + '.';
+    };
+    ['formule', 'modalite', 'debordement', 'fondateur'].forEach((n) => f[n].addEventListener('change', recalculer));
+    ['surface', 'prix_devis'].forEach((n) => f[n].addEventListener('input', recalculer));
+    recalculer();
     f.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const r = await api('contrat_preparer', { methode: 'POST', corps: { client_id: c.id, formule: f.formule.value, prix_mensuel: f.prix_mensuel.value, debut: f.debut.value, fondateur: f.fondateur.checked } });
+      const r = await api('contrat_preparer', { methode: 'POST', corps: choix() });
       if (r.ok) { blocContrat(c); return; }
-      f.querySelector('.message').textContent = { champs: 'Vérifiez la formule, le prix et la date de début (dans les six mois).', deja: 'Ce client a déjà un contrat à signer ou en cours.', societe: 'L\'identité de la société est incomplète.' }[r.erreur] || 'Le contrat n\'a pas été préparé.';
+      f.querySelector('.message').textContent = r.erreur === 'devis' ? 'Sur devis : le prix mensuel doit être d\'au moins ' + r.minimum + ' €.' : erreurs[r.erreur] || 'Le contrat n\'a pas été préparé.';
     });
   }
   zoneContrat.querySelectorAll('[data-annuler-contrat]').forEach((b) => b.addEventListener('click', async () => {
@@ -75,6 +102,11 @@ async function vueSociete() {
       <div class="deux">${champ('mediateur_nom')}${champ('mediateur_site')}</div>
       <div class="deux">${champ('assureur')}${champ('police')}</div>
       <div class="deux">${champ('juriste_nom')}${champ('juriste_le')}</div>
+      <fieldset class="saisie-groupe"><legend>Révision des prix</legend>
+        <p class="aide">Formule du contrat : P = P0 × (0,15 + 0,70 × S/S0 + 0,15 × C/C0). L'indexation sur le niveau général des prix est interdite (article L112-2 du Code monétaire et financier) : S suit le coût du travail des services, C le prix des produits. Le juriste choisit les indices exacts ; mettez à jour leurs valeurs à chaque publication de l'INSEE, chaque nouveau contrat prend les dernières comme référence.</p>
+        ${champ('indice_travail_nom')}<div class="deux">${champ('indice_travail_valeur')}${champ('indice_travail_periode')}</div>
+        ${champ('indice_produits_nom')}<div class="deux">${champ('indice_produits_valeur')}${champ('indice_produits_periode')}</div>
+      </fieldset>
       ${d.modifiable ? '<button class="principal">Enregistrer</button>' : '<p class="aide">Seule la direction modifie ces informations.</p>'}
       <p class="message" id="m" role="status"></p>
     </form>`;
@@ -83,7 +115,7 @@ async function vueSociete() {
     e.preventDefault();
     const corps = Object.fromEntries([...f.querySelectorAll('input')].map((i) => [i.name, i.value.trim()]));
     const r = await api('societe_enregistrer', { methode: 'POST', corps });
-    document.getElementById('m').textContent = r.ok ? (r.manques.length ? 'Enregistré. Il manque encore : ' + r.manques.join(', ') + '.' : 'Enregistré. Les contrats peuvent être préparés.') : 'Vérifiez la date de relecture.';
+    document.getElementById('m').textContent = r.ok ? (r.manques.length ? 'Enregistré. Il manque encore : ' + r.manques.join(', ') + '.' : 'Enregistré. Les contrats peuvent être préparés.') : r.erreur === 'indice' ? 'La valeur d\'un indice doit être un nombre positif.' : 'Vérifiez la date de relecture.';
   });
 }
 

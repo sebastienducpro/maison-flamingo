@@ -82,3 +82,4 @@ body{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
 .case-client input { flex: none; width: 22px; height: 22px; min-height: 0; padding: 0; margin: 2px 0 0; accent-color: #1F7A73; }
 .carte-espace select { font: inherit; font-size: 17px; background: #fff; border: 1.5px solid var(--sable); border-radius: 12px; padding: 12px 14px; min-height: 50px; width: 100%; }
 .actions-espace { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+[hidden] { display: none !important; }

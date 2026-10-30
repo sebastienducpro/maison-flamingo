@@ -10,3 +10,4 @@ h2 { font: 600 16px/1.3 system-ui, sans-serif; margin: 28px 0 8px; }
 .annexe, .preuve { margin-top: 32px; padding: 16px; border: 1px solid #E6D9C6; border-radius: 8px; }
 .preuve { border-color: #1F7A73; font: 13px/1.5 system-ui, sans-serif; word-break: break-word; }
 @media print { body { background: #fff; } .contrat { padding: 0; } }
+.formule { font: 600 15px/1.4 system-ui, sans-serif; text-align: center; padding: 10px; background: #F7F2EA; border-radius: 8px; }

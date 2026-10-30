@@ -247,3 +247,6 @@ label.case{flex-direction:row;align-items:center;gap:10px;min-height:44px;margin
 a.lien-fiche{display:grid;gap:4px;text-decoration:none;color:var(--encre);margin-bottom:12px}
 a.lien-fiche strong::after{content:' →'}
 .pastille:not(.vert):not(.orange):not(.rouge){background:#EEE;color:var(--gris)}
+
+/* Un élément masqué reste masqué, même quand sa classe l'affiche en flex : sinon deux écrans s'empilent sans erreur. */
+[hidden]{display:none!important}

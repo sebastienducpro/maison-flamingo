@@ -115,6 +115,10 @@ function a_facturer(array $k, string $mois): ?int
     if ($k['statut'] === 'resilie' && $k['resiliation_effet'] && $k['resiliation_effet'] < $debut_mois) {
         return null;
     }
+    // Payé à l'année : une seule facture, le mois du début puis chaque mois anniversaire ; le premier mois offert est déjà compté dedans.
+    if (($k['modalite'] ?? 'mensuel') === 'annuel') {
+        return substr($k['debut'], 5, 2) === substr($mois, 5, 2) && substr($k['debut'], 0, 7) <= $mois ? (int) round((float) $k['montant_annuel'] * 100) : null;
+    }
     if ((int) $k['fondateur'] === 1 && substr($k['debut'], 0, 7) === $mois) {
         return null;
     }
@@ -127,11 +131,17 @@ function rendre_facture(array $s, array $c, array $k, array $f, ?float $tva): st
     $ht = $tva !== null ? $ttc / (1 + $tva / 100) : null;
     $fmt = fn ($n) => number_format($n, 2, ',', ' ') . ' €';
     $mois = date_longue($f['periode'] . '-01');
-    $h = ['<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Facture ' . esc($f['numero']) . '</title><link rel="stylesheet" href="contrat.css?v=1"></head><body><main class="contrat">'];
+    $h = ['<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Facture ' . esc($f['numero']) . '</title><link rel="stylesheet" href="contrat.css?v=2"></head><body><main class="contrat">'];
     $h[] = '<header><p class="marque">Maison <strong>Flamingo</strong></p><h1>Facture n° ' . esc($f['numero']) . '</h1><p class="sous">Émise le ' . esc(date_longue($f['emise_le'])) . '</p></header>';
     $h[] = '<p><strong>' . esc($s['raison_sociale']) . '</strong>, ' . esc($s['forme']) . '<br>' . esc($s['adresse']) . '<br>SIRET ' . esc($s['siret']) . ' · ' . esc($s['rcs']) . '</p>';
     $h[] = '<p>Facturé à <strong>' . esc(trim($c['prenom'] . ' ' . $c['nom'])) . '</strong><br>' . esc(trim($c['adresse'] . ', ' . $c['commune'], ', ')) . '</p>';
-    $h[] = '<h2>Désignation</h2><p>Abonnement ' . esc($k['formule']) . ', contrat n° ' . esc($k['numero']) . ', mois de ' . esc(substr($mois, strpos($mois, ' ') + 1)) . '.</p>';
+    if (($k['modalite'] ?? 'mensuel') === 'annuel') {
+        $du = substr($k['debut'], 0, 4) === substr($f['periode'], 0, 4) ? $k['debut'] : $f['periode'] . substr($k['debut'], 7);
+        $au = date('Y-m-d', strtotime($du . ' +12 months -1 day'));
+        $h[] = '<h2>Désignation</h2><p>Abonnement annuel ' . esc($k['formule']) . ', contrat n° ' . esc($k['numero']) . ', du ' . esc(date_longue($du)) . ' au ' . esc(date_longue($au)) . ', payé d\'avance avec ' . (int) REMISE_ANNUELLE_PCT . ' % de remise.</p>';
+    } else {
+        $h[] = '<h2>Désignation</h2><p>Abonnement ' . esc($k['formule']) . ', contrat n° ' . esc($k['numero']) . ', mois de ' . esc(substr($mois, strpos($mois, ' ') + 1)) . '.</p>';
+    }
     $h[] = $ht !== null
         ? '<p>Montant hors taxes : ' . $fmt($ht) . '<br>TVA à ' . esc(rtrim(rtrim(number_format($tva, 2, ',', ''), '0'), ',')) . ' % : ' . $fmt($ttc - $ht) . '<br><strong>Total TTC : ' . $fmt($ttc) . '</strong></p>'
         : '<p><strong>Total : ' . $fmt($ttc) . '</strong><br>' . esc($s['mention_tva']) . '</p>';

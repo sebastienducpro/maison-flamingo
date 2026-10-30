@@ -12,7 +12,7 @@ async function vueContratClient(message = '') {
   const carte = (k) => `
     <section class="carte-espace" data-id="${k.id}">
       <p class="surtitre">Contrat ${echapper(k.numero)} · ${MOTS_CONTRAT[k.statut] || ''}</p>
-      <h2>${echapper(k.formule)} · ${Number(k.prix_mensuel).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} € TTC par mois</h2>
+      <h2>${echapper(k.formule)} · ${k.modalite === 'annuel' ? Number(k.montant_annuel).toLocaleString('fr-FR') + ' € TTC par an, payés d\'avance' : Number(k.prix_mensuel).toLocaleString('fr-FR', { minimumFractionDigits: 2 }) + ' € TTC par mois'}</h2>
       <p>Début le ${echapper(jourFr(k.debut))}${k.engagement_mois ? `, pour une saison de ${k.engagement_mois} mois reconduite avec rappel écrit` : ', sans engagement'}${k.fondateur ? ' · offre fondateur' : ''}.</p>
       <p><a class="bouton" href="api.php?action=contrat_document&id=${k.id}" target="_blank" rel="noopener">Lire le contrat complet</a></p>
       ${k.statut === 'a_signer' ? `
